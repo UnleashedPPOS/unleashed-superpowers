@@ -1,0 +1,20 @@
+{
+  "name": "unleashed-superpowers",
+  "description": "AI-native design skills — anthropomorphic surface, AI-native engine, event-log bridge. Plus reference-quality feature documentation.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Elliot Kelly",
+    "email": "elliotkelly@unleashed.vision"
+  },
+  "homepage": "https://github.com/UnleashedPPOS/unleashed-superpowers",
+  "repository": "https://github.com/UnleashedPPOS/unleashed-superpowers",
+  "license": "MIT",
+  "keywords": [
+    "ai-native-design",
+    "skills",
+    "claude-code",
+    "multi-agent",
+    "documentation",
+    "two-layer-design"
+  ]
+}
