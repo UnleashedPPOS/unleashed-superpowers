@@ -155,7 +155,7 @@ These don't touch the tree, so dispatch them concurrently and collect structured
 3. **Dead-code / duplication analysis** — `everything-claude-code:refactor-cleaner` agent in REPORT mode (identify only) so its findings feed the sequential apply step below without racing the other reviewers.
 4. **Voice coverage** — `voice-coverage-audit` skill scoped to the touched module if any voice/Stream surface changed.
 
-Anti-watchdog (per `feedback_subagent_completion_verification.md`): foreground parallel Agent calls in a single message are fine; keep background subagents ≤2. Every brief carries the scope-fence file list and a "return findings as a ranked list with file:line, do not fix" instruction. After each returns, verify by quoting its actual findings — never the return string alone.
+Anti-watchdog (per `feedback_subagent_completion_verification.md`): **cap concurrency at ≤3 reviewers per wave** — 4+ parallel agents reliably trips the harness watchdog. If more than 3 reviewers apply, run them in two waves (e.g. code+security+refactor, then voice-coverage+lang-specific) rather than all at once; keep background subagents ≤2. Every brief carries the scope-fence file list and a "return findings as a ranked list with file:line, do not fix" instruction. After each returns, verify by quoting its actual findings — never the return string alone.
 
 ### 2.B — Cleanup + fix skills (MUTATING, run SEQUENTIALLY, each its own commit)
 After the reviewers report, apply fixes. These edit the working tree, so they run one at a time, each committed separately (never smuggle a review fix into an unrelated commit):
