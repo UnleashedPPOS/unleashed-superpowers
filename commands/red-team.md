@@ -18,7 +18,7 @@ Evidence means the disconfirming experiment ran and the claim survived: command 
 
 ### Governing lessons (encode these — they are the failure modes this command exists to catch)
 
-- **Close findings before reporting** (`feedback_close_findings_before_reporting.md`): you NEVER hand the user a list of issues. Anything you find, you fix, verify, and merge. The only acceptable returns are "Done — here's the proof" or "Blocked on [genuine external input]". A finding in the final report is a failure of this command.
+- **Close findings before reporting** (`feedback_close_findings_before_reporting.md`): you NEVER hand the user a list of issues you could have closed. Anything that is MINE-TO-FIX, you fix, verify, and merge. The only acceptable returns are "Done — here's the proof", a tracked **OWNED-ELSEWHERE** finding (a live PR/worktree is already closing it — linked + confirmed), or "Blocked on [genuine external input]". A finding you could have fixed but left is a failure of this command.
 - **Test the real integration path, not a proxy.** Verifying a *component* in isolation does not verify the *wired path*. Canonical miss: proving the SES identity could send (SigV4 API) while never proving Supabase's stored SMTP credentials authenticate (derived password). Always exercise the exact path production uses.
 - **Silent empty-success is the worst failure mode** (`Lessons 2026-05-21, streaming/tools`): an HTTP 200 with `actions:[]`, an insert that RLS-denied without throwing, a no-op that logs nothing. These are invisible to Sentry, logs, and users. Hunt them specifically — assert on the *effect* (row written, email received, state changed), never on the absence of an error.
 - **Disk/content over status strings** (`feedback_subagent_completion_verification.md`): GitHub `mergeable`/`mergeStateStatus` lag and lie; a subagent's "completed" return can be a mid-thought cutoff. Verify with `git merge-base --is-ancestor` + `git grep <the actual symbol>`, real file presence, real query results.
@@ -67,7 +67,7 @@ When a single claim is high-stakes or could fail in several independent ways, di
 Claims cover what someone thought about. Now hunt what nobody claimed:
 
 - **Secrets in git** — `git grep -nE "(sk_|AKIA|AIza|eyJ[A-Za-z0-9_-]{20,})"` over what landed this session. Zero hits, proven.
-- **Leftovers** — orphaned worktrees, extra credentials/keys you minted and didn't retire, temp files holding secrets, stray branches, dirty working-tree files OR off-intent files swept into a commit (`git show --name-only <sha>` vs the stated intent — this session swept a command file into a voice-fix commit).
+- **Leftovers** — orphaned worktrees, extra credentials/keys you minted and didn't retire, temp files holding secrets, stray branches, dirty working-tree files OR off-intent files swept into a commit (`git show --name-only <sha>` vs the stated intent — e.g. a past session swept a command file into a voice-fix commit).
 - **Branch reality** — `git rev-list --count origin/main..HEAD`, authorship spread, PR existence, concurrent foreign pushes. If "merged/ready" was claimed, prove the branch is actually an isolated, PR-backed, quiescent unit — not a live shared track.
 - **Claimed reviews/audits** — for every "reviewed / audited / security-checked" claim, confirm the agent actually ran with findings on record. No record = the audit is unfalsified and counts as not done.
 - **Drift** — DNS/desired-state snapshots, `schema_migrations`, deployed-vs-repo edge functions. Trigger the drift/health workflow and confirm green on the real HEAD.
@@ -98,7 +98,7 @@ For everything in **MINE TO FIX**: fix it (senior-dev autonomy), then **re-run t
 
 ## Phase 4 — Report (only when the surface is clean)
 
-Per close-findings-before-reporting: **do not return unfixed findings.** If the attack found cracks, they are already fixed, verified, and merged before you write a word. The report is a record of attacks that the work *survived*, plus the fixes that made survival true.
+Per close-findings-before-reporting: **do not return a finding you could have fixed but didn't.** Every MINE-TO-FIX crack is already fixed, verified, and merged before you write a word. The ONLY findings allowed to appear unresolved are the two dispositions you genuinely cannot close yourself: **OWNED-ELSEWHERE** (a live PR/worktree is on it — linked + confirmed) and **GENUINE-EXTERNAL** (credential / design call / platform limit). The report is a record of attacks the work *survived*, the cracks you fixed to make survival true, and the cracks whose fix is legitimately not yours to make.
 
 ```markdown
 # Red-Team: <scope>
@@ -141,6 +141,10 @@ Outcome legend — be honest, never inflate: `✅ SURVIVED` = the disconfirming 
 - **Real path only.** Never accept a proxy test for the wired path. If you tested a component, you have not tested the integration.
 - **Assert on effect, never on absence-of-error.** Silent empty-success is the prime target, not an afterthought.
 - **Ground truth over status strings.** Content-proof + disk + live queries; never the GitHub `mergeable` flag or a subagent return string alone.
-- **Fix > flag. Always.** A finding in the report is a failure. Fix it, verify it, merge it — then report it as survived.
-- **Only block on genuine externals.** Credentials, business/design decisions, or true platform limits. Everything else, a senior dev just fixes.
+- **Fix > flag — unless it's OWNED-ELSEWHERE.** A *fixable, unowned* finding in the report is a failure: fix it, verify it, merge it. But a finding already being worked in an open PR / active worktree is NOT yours to fix — link it, confirm it covers the crack, mark it tracked. Three dispositions, no fourth: MINE-TO-FIX, OWNED-ELSEWHERE, GENUINE-EXTERNAL. "Unfixed because I didn't bother" is not on the list.
+- **Hands off others' in-flight work.** Never stash/switch/reset/prune over uncommitted WIP or a foreign worktree to "tidy up." `git status --porcelain` + `git worktree list` before any tree mutation; isolate fixes in a fresh worktree off `origin/main`. A deleted "leftover" can be someone's unsaved hours.
+- **Attack the biggest claim first.** Rank claims by blast radius and go after the load-bearing "it works end-to-end / it's shippable / it's done" claim before the nitpicks — that's where the highest-value falsification hides. (The onboarding-crash falsification came from attacking "state of the art," not from grepping `String(error)`.)
+- **A fix someone ELSE made is still a claim — re-attack it.** "Already fixed by the overnight team / a prior PR" is an assertion, not proof. Re-run the disconfirming experiment yourself; if you genuinely can't (no prod access, etc.), say so explicitly and mark it 🔬 INSPECTED / external — never launder their prose into your ✅.
+- **Inspection ≠ execution — label it honestly.** If you read the code and it looks right but you did NOT run the disconfirming experiment, it is `🔬 INSPECTED`, never `✅ SURVIVED`. Reserve INSPECTED for low-risk textbook-correct patterns and state why you didn't execute. Padding the ✅ column with un-run claims is the exact self-deception this command exists to kill.
+- **Only block on genuine externals.** Credentials, business/design decisions, or true platform limits. Everything else, a senior dev just fixes (or routes to its in-flight owner).
 - **Scope = this session's claims.** Don't expand into unrelated audits; surface interactions in the ledger, not scope creep.
