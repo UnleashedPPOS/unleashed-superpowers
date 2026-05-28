@@ -1,0 +1,124 @@
+# /red-team — Falsify "It's Done / All Good"
+
+You are the engineer who does **not** believe the work is finished. Someone (often you, ten minutes ago) just said "done", "works", "passing", "merged", "all good". Your job is to **try to prove that claim false** — find the hidden failure mode, the silent no-op, the proxy test that never exercised the real path. Assume the happy-path demo lied. Then **fix whatever cracks**, prove the fix, and only report back when the surface is genuinely clean.
+
+This is **falsification, not a checklist**. `/ship-check` walks a broad readiness audit and merges. `/red-team` does one thing: takes claims already believed true and **attacks them with disconfirming evidence**. Run it after `/ship-check`, after a "done", or any time the cost of being wrong is high.
+
+Origin: the standing instruction — *"We show everything, all good. Now look for a reason for it NOT to be."* That sentence is the whole job.
+
+Target scope: `$ARGUMENTS` (if empty, infer from this session's claims + `git log origin/main..HEAD` — bounded to THIS session's work).
+
+---
+
+## Prime Directive — A claim is false until a disconfirming test fails to break it
+
+For every "it works", the question is **not** "does it look right?" It is: **"what is the cheapest experiment that would FAIL if this were secretly broken — and have I run it?"** If you haven't run that experiment, the claim is `⚠️ UNTESTED`, never `✅`. Looking at the code is not testing it. A green status flag is not testing it. The demo working once is not testing it.
+
+Evidence means the disconfirming experiment ran and the claim survived: command output, a real send/receipt, a DB SELECT, a content-proof grep, a deploy log line. Cite it.
+
+### Governing lessons (encode these — they are the failure modes this command exists to catch)
+
+- **Close findings before reporting** (`feedback_close_findings_before_reporting.md`): you NEVER hand the user a list of issues. Anything you find, you fix, verify, and merge. The only acceptable returns are "Done — here's the proof" or "Blocked on [genuine external input]". A finding in the final report is a failure of this command.
+- **Test the real integration path, not a proxy.** Verifying a *component* in isolation does not verify the *wired path*. Canonical miss: proving the SES identity could send (SigV4 API) while never proving Supabase's stored SMTP credentials authenticate (derived password). Always exercise the exact path production uses.
+- **Silent empty-success is the worst failure mode** (`Lessons 2026-05-21, streaming/tools`): an HTTP 200 with `actions:[]`, an insert that RLS-denied without throwing, a no-op that logs nothing. These are invisible to Sentry, logs, and users. Hunt them specifically — assert on the *effect* (row written, email received, state changed), never on the absence of an error.
+- **Disk/content over status strings** (`feedback_subagent_completion_verification.md`): GitHub `mergeable`/`mergeStateStatus` lag and lie; a subagent's "completed" return can be a mid-thought cutoff. Verify with `git merge-base --is-ancestor` + `git grep <the actual symbol>`, real file presence, real query results.
+- **"Work complete" ≠ done** (`Lessons 2026-04-15`): migration → `information_schema` SELECT; edge fn → `list_edge_functions` `updated_at` advanced + a 2xx in logs; test → exit code + count.
+- **Senior-dev autonomy** (`feedback_senior_dev.md`): when the attack surfaces a clearly-correct fix (no trade-off, no design call), apply it immediately. Reserve questions for genuine design/business/credential decisions.
+
+---
+
+## Phase 0 — Build the Claim Ledger
+
+You cannot attack what you haven't named. Enumerate every assertion of correctness in scope. Sources, in order:
+
+1. **This conversation** — every "done / works / fixed / passing / merged / verified / configured / all good" you or the user stated.
+2. `git log origin/main..HEAD --oneline` — each commit subject is a claim of a working deliverable.
+3. Remote/config changes made this session that have no commit (DB config, DNS, third-party dashboards, secrets) — these are the *most* likely to be unverified because there's no diff to review.
+4. `tasks/todo.md` checked items, if present.
+
+Output a **Claim Ledger**: one row per claim. For each, write the **single disconfirming experiment** — the test whose failure would prove the claim false. If a claim has *no* possible disconfirming test, that itself is the finding: it is unfalsifiable as built, and you must add observability/an assertion until it can be tested.
+
+A claim is not in scope if it predates this session and nothing you did touches it (state it and move on). But if your change *interacts* with it, it's in scope.
+
+---
+
+## Phase 1 — Attack Each Claim (run the disconfirming experiment)
+
+For each ledger row, actually run the experiment. Bias every attack toward the real path and the unhappy edges:
+
+- **Real path, not proxy.** Drive the exact wiring production uses (the stored credential, the deployed function, the live route + redirect allowlist, the actual env the user runs). Not a stand-in that shares only part of the chain.
+- **Effect, not absence-of-error.** Prove the row was written / the email arrived / the state changed / the redirect lands on the right origin. A 200 and a missing exception prove nothing.
+- **Cross-environment & cross-device.** Does it work in the env the *user* runs (local dev port, prod domain), not just the one you tested? Different browser/device for token flows (PKCE verifier locality), cold cache, logged-out, brand-new user, expired link.
+- **Boundaries & second-order effects.** A global setting changed for feature A — grep every *other* consumer (B, C) it silently affects. New minimum/limit/flag — what existing flow now trips it?
+- **The lag/lie surfaces.** Re-fetch ground truth; never trust a cached status flag or a return string.
+- **Adversarial inputs where security-relevant.** Auth, user input, secrets, endpoints, money: can the attack make it misbehave?
+
+When a single claim is high-stakes or could fail in several independent ways, dispatch parallel subagents — each with a tight scope, a pre-baked disconfirming test, a hard poll cap, and an instruction to verify by artefact. Cap ≤2 concurrent background agents; verify their work by git/disk content, never the return string.
+
+---
+
+## Phase 2 — Hidden-Failure Sweep (the things no claim mentioned)
+
+Claims cover what someone thought about. Now hunt what nobody claimed:
+
+- **Secrets in git** — `git grep -nE "(sk_|AKIA|AIza|eyJ[A-Za-z0-9_-]{20,})"` over what landed this session. Zero hits, proven.
+- **Leftovers** — orphaned worktrees, extra credentials/keys you minted and didn't retire, temp files holding secrets, stray branches, dirty working-tree files swept into a commit.
+- **Drift** — DNS/desired-state snapshots, `schema_migrations`, deployed-vs-repo edge functions. Trigger the drift/health workflow and confirm green on the real HEAD.
+- **Observability gaps** — if a path can fail silently, does anything alert? If not, that's a finding (add the breadcrumb/assert).
+- **Docs vs reality** — did a value change (a minimum, a URL, a default) that a doc or copy string still states the old way?
+
+---
+
+## Phase 3 — Fix, then re-run the attack
+
+For everything that cracked: fix it (senior-dev autonomy), then **re-run the exact disconfirming experiment** and confirm the claim now survives. A fix you didn't re-test is just a new untested claim. One concern per commit. Each code/config fix follows the repo's merge discipline:
+
+- Isolate from unrelated working-tree WIP (worktree off `origin/main` when the main checkout is dirty).
+- Required CI green at merge time (`gh pr checks` — never merge on pending/failing).
+- Conflict check via `git merge-tree`, not the GitHub `mergeable` flag.
+- Squash-merge, then content-proof: `git merge-base --is-ancestor <sha> origin/main` **and** `git grep <symbol> origin/main -- <file>`.
+- Clean up branches/worktrees/temp-secrets after.
+
+---
+
+## Phase 4 — Report (only when the surface is clean)
+
+Per close-findings-before-reporting: **do not return unfixed findings.** If the attack found cracks, they are already fixed, verified, and merged before you write a word. The report is a record of attacks that the work *survived*, plus the fixes that made survival true.
+
+```markdown
+# Red-Team: <scope>
+
+## Claim Ledger (each claim → the attack that would have falsified it → outcome)
+| Claim | Disconfirming experiment run | Evidence | Survived? |
+|-------|------------------------------|----------|-----------|
+| <e.g. "Supabase sends via SES"> | Real SMTP AUTH+send with the stored credential | 250 OK + receipt; 0 bounces | ✅ |
+| ... | ... | ... | ✅ |
+
+## Cracks found → fixed → re-proven
+| Crack | Why it was invisible | Fix (PR/SHA) | Re-attack evidence |
+|-------|----------------------|--------------|--------------------|
+| <missing X> | <silent 200 / proxy test / lagging flag> | #NNN `<sha>` | <experiment re-run, now passes> |
+
+## Hidden-failure sweep
+- Secrets in git: 0 (grep proof)
+- Leftovers / drift / observability: <each proven clean, or fixed above>
+
+## Honest residual risk
+- <Only genuinely-external limitations the user must decide on — credentials, business calls, or inherent platform constraints with a graceful-degradation note. NOT a backlog of things you could have fixed.>
+
+## Verdict
+**SURVIVED** — every claim attacked, every crack fixed + merged + re-proven. Nothing left for you to chase.
+```
+
+---
+
+## Hard Rules
+
+- **Falsify, don't confirm.** Your default posture is "this is broken and I will prove it." Confirmation bias is the enemy.
+- **No `✅` without a disconfirming experiment that ran and survived.** Reading code, a green flag, or a one-time demo is `⚠️ UNTESTED`.
+- **Real path only.** Never accept a proxy test for the wired path. If you tested a component, you have not tested the integration.
+- **Assert on effect, never on absence-of-error.** Silent empty-success is the prime target, not an afterthought.
+- **Ground truth over status strings.** Content-proof + disk + live queries; never the GitHub `mergeable` flag or a subagent return string alone.
+- **Fix > flag. Always.** A finding in the report is a failure. Fix it, verify it, merge it — then report it as survived.
+- **Only block on genuine externals.** Credentials, business/design decisions, or true platform limits. Everything else, a senior dev just fixes.
+- **Scope = this session's claims.** Don't expand into unrelated audits; surface interactions in the ledger, not scope creep.
