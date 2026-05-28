@@ -60,6 +60,10 @@ For each ledger row, actually run the experiment. Bias every attack toward the r
 
 When a single claim is high-stakes or could fail in several independent ways, dispatch parallel subagents — each with a tight scope, a pre-baked disconfirming test, a hard poll cap, and an instruction to verify by artefact. Cap ≤2 concurrent background agents; verify their work by git/disk content, never the return string.
 
+**Compose, don't reinvent — two existing tools are stronger falsifiers than hand-rolled probes:**
+- **Code-correctness / quality claims** → the cheapest disconfirming experiment is usually `/ship-check`'s reviewer fan-out (parallel `superpowers:code-reviewer` + `everything-claude-code` code/security reviewers + refactor-cleaner), not a bespoke attack you write here. Invoke that and attack its findings rather than duplicating review logic in red-team.
+- **High-stakes claim, cheap test passed, still not confident** → escalate to `/code-review ultra` (deep multi-agent cloud review). It is a strictly stronger falsifier than manual probing; reach for it before declaring a high-stakes claim SURVIVED on thin evidence.
+
 ---
 
 ## Phase 2 — Hidden-Failure Sweep (the things no claim mentioned)
