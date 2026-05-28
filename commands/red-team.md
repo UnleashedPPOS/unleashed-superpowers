@@ -24,6 +24,11 @@ Evidence means the disconfirming experiment ran and the claim survived: command 
 - **Disk/content over status strings** (`feedback_subagent_completion_verification.md`): GitHub `mergeable`/`mergeStateStatus` lag and lie; a subagent's "completed" return can be a mid-thought cutoff. Verify with `git merge-base --is-ancestor` + `git grep <the actual symbol>`, real file presence, real query results.
 - **"Work complete" ≠ done** (`Lessons 2026-04-15`): migration → `information_schema` SELECT; edge fn → `list_edge_functions` `updated_at` advanced + a 2xx in logs; test → exit code + count.
 - **Senior-dev autonomy** (`feedback_senior_dev.md`): when the attack surfaces a clearly-correct fix (no trade-off, no design call), apply it immediately. Reserve questions for genuine design/business/credential decisions.
+- **Verification theater is a claim too.** "I reviewed it / ran the security pass / audited it" is itself a falsifiable assertion — attack it. Did the review agent actually execute, or did someone *assert* it and eyeball the diff? A claimed-but-unrun review is a silent gap: this exact miss let an arg-name mis-split bug survive a "ship-check passed" report until the reviews were actually run. If you can't cite the agent's findings, the review didn't happen.
+- **"Merged / ready to merge" must be falsified against branch reality.** Before believing work is landable: does a dedicated PR exist? Is the branch your commits ALONE, or is it an integration branch carrying other authors' commits (`git log origin/main..HEAD --format='%an'`)? Is anyone still pushing to it (foreign commit after your push, `.git/index.lock` collision)? "Merge it" can silently mean "ship a 20-commit multi-author track to prod." An entangled/no-PR/live branch is NOT merge-ready as an isolated action — that's a finding, not a green light.
+- **New artefacts that contradict existing ones.** A test/eval/fixture/doc you added that disagrees with an existing one (same input, different expected outcome; new default vs documented old default) is a silent landmine — green that means nothing, or two "truths" that can't both hold. Grep the corpus for the contradiction and resolve it.
+- **A real crack can already be OWNED by in-flight work — fixing it yourself is the wrong move.** Before fixing anything, check whether an open PR or an active worktree is *already* on it (`gh pr list --state open --search <area>`, `git worktree list`, last-commit recency on the candidate branch). If yes, you do NOT fix it — touching it duplicates effort, forks the solution, or hard-conflicts a teammate/parallel-agent who is mid-flight. The correct disposition is **OWNED-ELSEWHERE**: link the PR/branch, confirm it genuinely covers the crack, and mark it *tracked, not failed*. This is a third outcome alongside "fixed by me" and "genuine external" — it is NOT a violation of fix>flag, because the fix IS happening, just not by your hand. Encountered live: the runtime half of a drift fix was being authored in PR #368 (commit 3 minutes old) while red-team was closing the detection half — force-fixing it would have collided.
+- **Never mutate another agent's in-flight work to "tidy up."** Before any branch switch, worktree prune, stash, or reset: `git status --porcelain` (is the working tree carrying uncommitted changes that aren't yours?) and `git worktree list` (is that worktree someone else's active task?). Uncommitted WIP or a foreign-task worktree = HANDS OFF; flag it, never delete/overwrite it. A "leftover" you blow away can be a parallel session's unsaved hours. The housekeeping itch is not worth the data loss.
 
 ---
 
@@ -62,16 +67,26 @@ When a single claim is high-stakes or could fail in several independent ways, di
 Claims cover what someone thought about. Now hunt what nobody claimed:
 
 - **Secrets in git** — `git grep -nE "(sk_|AKIA|AIza|eyJ[A-Za-z0-9_-]{20,})"` over what landed this session. Zero hits, proven.
-- **Leftovers** — orphaned worktrees, extra credentials/keys you minted and didn't retire, temp files holding secrets, stray branches, dirty working-tree files swept into a commit.
+- **Leftovers** — orphaned worktrees, extra credentials/keys you minted and didn't retire, temp files holding secrets, stray branches, dirty working-tree files OR off-intent files swept into a commit (`git show --name-only <sha>` vs the stated intent — this session swept a command file into a voice-fix commit).
+- **Branch reality** — `git rev-list --count origin/main..HEAD`, authorship spread, PR existence, concurrent foreign pushes. If "merged/ready" was claimed, prove the branch is actually an isolated, PR-backed, quiescent unit — not a live shared track.
+- **Claimed reviews/audits** — for every "reviewed / audited / security-checked" claim, confirm the agent actually ran with findings on record. No record = the audit is unfalsified and counts as not done.
 - **Drift** — DNS/desired-state snapshots, `schema_migrations`, deployed-vs-repo edge functions. Trigger the drift/health workflow and confirm green on the real HEAD.
 - **Observability gaps** — if a path can fail silently, does anything alert? If not, that's a finding (add the breadcrumb/assert).
 - **Docs vs reality** — did a value change (a minimum, a URL, a default) that a doc or copy string still states the old way?
 
 ---
 
-## Phase 3 — Fix, then re-run the attack
+## Phase 3 — Triage each crack, then fix + re-run the attack
 
-For everything that cracked: fix it (senior-dev autonomy), then **re-run the exact disconfirming experiment** and confirm the claim now survives. A fix you didn't re-test is just a new untested claim. One concern per commit. Each code/config fix follows the repo's merge discipline:
+**First, triage every crack into exactly ONE disposition** (do this before writing any fix):
+
+1. **OWNED-ELSEWHERE** — an open PR or active worktree is already on it. Check: `gh pr list --state open --search "<area/symbol>"`, `git worktree list`, and last-commit recency on the candidate branch. If a live effort covers the crack: **do not fix it.** Verify the in-flight work genuinely addresses it (read its diff/plan), link the PR/branch, mark *tracked, not failed*. Touching it = collision/duplication.
+2. **MINE TO FIX** — real crack, no in-flight owner, and either no design trade-off or a clearly-correct senior call. Fix it (below).
+3. **GENUINE EXTERNAL** — needs a credential, a business/design decision, or hits a true platform limit you cannot resolve. Surface it as residual risk with a graceful-degradation note. Only this category and OWNED-ELSEWHERE are allowed to appear unresolved in the report.
+
+**Before any fix touches the tree, run the don't-mutate-others'-work check** (`git status --porcelain` + `git worktree list`): if the main checkout carries uncommitted WIP that isn't yours, or your fix would land in a foreign worktree, isolate in a fresh worktree off `origin/main` — never stash/switch/reset over someone else's unsaved work.
+
+For everything in **MINE TO FIX**: fix it (senior-dev autonomy), then **re-run the exact disconfirming experiment** and confirm the claim now survives. A fix you didn't re-test is just a new untested claim. One concern per commit. Each code/config fix follows the repo's merge discipline:
 
 - Isolate from unrelated working-tree WIP (worktree off `origin/main` when the main checkout is dirty).
 - Required CI green at merge time (`gh pr checks` — never merge on pending/failing).
@@ -89,25 +104,32 @@ Per close-findings-before-reporting: **do not return unfixed findings.** If the 
 # Red-Team: <scope>
 
 ## Claim Ledger (each claim → the attack that would have falsified it → outcome)
-| Claim | Disconfirming experiment run | Evidence | Survived? |
-|-------|------------------------------|----------|-----------|
-| <e.g. "Supabase sends via SES"> | Real SMTP AUTH+send with the stored credential | 250 OK + receipt; 0 bounces | ✅ |
-| ... | ... | ... | ✅ |
+Outcome legend — be honest, never inflate: `✅ SURVIVED` = the disconfirming experiment RAN and the claim held. `🔬 INSPECTED` = read the code/config and it looks correct, but the experiment was NOT executed (lower confidence — say so; only acceptable for low-risk, textbook-correct patterns, and say *why* you didn't run it). `🔴 CRACKED` = falsified → see next table.
+| Claim | Disconfirming experiment | Evidence | Outcome |
+|-------|--------------------------|----------|---------|
+| <e.g. "Supabase sends via SES"> | Real SMTP AUTH+send with the stored credential | 250 OK + receipt; 0 bounces | ✅ SURVIVED |
+| <e.g. "cohort cap is atomic"> | Read RPC: `UPDATE…WHERE claimed<cap` under row lock | textbook-correct; concurrency test not run | 🔬 INSPECTED |
+| ... | ... | ... | ... |
 
-## Cracks found → fixed → re-proven
+## Cracks found → fixed → re-proven (the MINE-TO-FIX disposition)
 | Crack | Why it was invisible | Fix (PR/SHA) | Re-attack evidence |
 |-------|----------------------|--------------|--------------------|
 | <missing X> | <silent 200 / proxy test / lagging flag> | #NNN `<sha>` | <experiment re-run, now passes> |
 
+## Owned elsewhere (real crack, an in-flight effort already covers it — tracked, NOT my fix)
+| Crack | Owner (PR/branch + recency) | How I confirmed it covers the crack |
+|-------|-----------------------------|-------------------------------------|
+| <X> | #NNN `branch`, last commit <when> | <read its diff/plan; it addresses Y> |
+
 ## Hidden-failure sweep
 - Secrets in git: 0 (grep proof)
-- Leftovers / drift / observability: <each proven clean, or fixed above>
+- Leftovers / drift / observability / others' uncommitted WIP: <each proven clean, or fixed above, or flagged-hands-off>
 
 ## Honest residual risk
 - <Only genuinely-external limitations the user must decide on — credentials, business calls, or inherent platform constraints with a graceful-degradation note. NOT a backlog of things you could have fixed.>
 
 ## Verdict
-**SURVIVED** — every claim attacked, every crack fixed + merged + re-proven. Nothing left for you to chase.
+**SURVIVED** — every claim attacked; every MINE-TO-FIX crack fixed + merged + re-proven; every OWNED-ELSEWHERE crack confirmed covered by a live effort. Nothing left for you to chase that is mine to chase.
 ```
 
 ---
