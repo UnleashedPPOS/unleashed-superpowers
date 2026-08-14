@@ -53,4 +53,4 @@ If the original human-team estimate was in weeks, describe the 48-hour AI-native
 
 ---
 
-Reference: `docs/superpowers/specs/2026-04-18-two-layer-ai-native-design.md`
+Reference: `docs/specs/2026-04-18-two-layer-ai-native-design.md`

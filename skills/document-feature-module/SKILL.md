@@ -122,7 +122,7 @@ If a single topic bloats one of the core files, split it out: `ai-coaches.md`, `
 
 ## Authoring workflow
 
-1. **Read the source first.** Before writing a sentence, `Glob` the module directory and `Read` every file that will be referenced. Resist writing from memory or prior docs.
+1. **Read the source first.** Read every file you'll reference before writing about it. Resist writing from memory or prior docs.
 2. **Write README.md last.** Navigation and quick reference are easier to assemble once the sub-files exist.
 3. **Every code reference gets verified by grep.** If you wrote "`useVision` returns `{ northStar, goals }`", grep `useVision.ts` and confirm. If the return shape differs, the doc is wrong, not the code.
 4. **Apply both lenses to each section before marking it done.** Treat lens failures as blocking.
