@@ -30,7 +30,7 @@ Invoke this skill when any of these are true:
 
 ## Mandatory checklist
 
-Create a TodoWrite todo for each pass; complete in order. Do NOT skip passes. The skill runs ALL FOUR even when the user only asked about one.
+Complete all four passes in order — do not skip any, even when the user only asked about one.
 
 ### Pass 0 — Mine human domain expertise
 
@@ -45,7 +45,7 @@ For each role the AI will occupy, gather and document:
 
 **Output:** structured list of expertise artefacts per role.
 
-**Mechanisation:** if Project C (the "instant level-up" research pipeline, planned at `.claude/plans/jazzy-finding-coral.md`) is available, invoke it to mechanise this pass. Otherwise gather manually (interviews, forum mining, YouTube, books, industry publications).
+Gather manually: interviews, forum mining, YouTube, books, industry publications. Use an automated research pipeline instead if one is available to you.
 
 ### Pass 0.5 — Design the documentation substrate
 
@@ -98,18 +98,18 @@ For each role, decide:
 
 Pick from these; don't invent new patterns without justification.
 
-- **Blackboard** — shared state, opportunistic workers. For tasks with unpredictable partial results.
-- **DAG** — explicit dependencies, parallel where independent. For known task graphs.
-- **Self-assigning queue** — uniform independent tasks pulled by workers.
-- **Ensemble + consensus** — same call N times, voted or clustered. For safety-critical or low-tolerance outputs.
-- **Critic loop** — worker writes, critic evaluates, iterate. For quality-over-speed work.
-- **Sub-agent spawn / recurse** — agent spawns its own sub-agents for sub-problems. For irregular tree depth.
-- **Pub-sub** — workers subscribe to event types. For reactive decentralised coordination.
-- **Pipeline (A→B→C)** — sequential. Use ONLY when each stage's output IS the next stage's input AND parallelism is impossible. Most "pipelines" are actually DAGs.
+- **Blackboard** — unpredictable partial results.
+- **DAG** — known task graph, parallel where independent.
+- **Self-assigning queue** — uniform independent tasks.
+- **Ensemble + consensus** — safety-critical or low-tolerance outputs.
+- **Critic loop** — quality-over-speed work.
+- **Sub-agent spawn / recurse** — irregular tree depth.
+- **Pub-sub** — reactive, decentralised coordination.
+- **Pipeline (A→B→C)** — ONLY when each stage's output IS the next stage's input AND parallelism is impossible. Most "pipelines" are actually DAGs.
 
 ## Presentation pattern catalogue
 
-- **Named agent tiles** — persistent UI elements representing logical roles, subscribing to engine events.
+- **Named agent tiles** — persistent UI elements per logical role, subscribing to engine events.
 - **Live event feed** — chronological anthropomorphic projection of the event log.
 - **Progress indicators** — per-tile + aggregate, derived from event counts.
 - **Team timelines / Gantt** — high-level temporal views.
@@ -170,4 +170,4 @@ These thoughts mean STOP — you're rationalising:
 
 ## Reference
 
-Full design spec with cognitive-science grounding, prior art, and worked examples: `docs/superpowers/specs/2026-04-18-two-layer-ai-native-design.md`.
+Full design spec with cognitive-science grounding, prior art, and worked examples: `docs/specs/2026-04-18-two-layer-ai-native-design.md`.
