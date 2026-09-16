@@ -74,6 +74,10 @@ Golden rule: **every factual claim resolves to a grepable symbol.** If you can't
 
 **`/document-feature-module <target>`** — Thin wrapper that invokes the `document-feature-module` skill against a target module.
 
+## Definition of Done
+
+`skills/definition-of-done/SKILL.md` is the ledger every "ship it" must fill: intent, front end, back end, integrations, payments, security, verification, ship, aftercare. `/dod <feature>` prints it with the verdict first. Rows are DONE · N/A · OWNER · NOT DONE, never "deferred".
+
 ## Roadmap
 
 - **Phase 2** — audit and add (with attribution) a set of currently-held skills: `ui-ux-pro-max`, `/ux-simplify`, `/ship-check`, `/create-command`, `/list-mcps`, `/evaluate-repository`.
