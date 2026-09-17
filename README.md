@@ -70,17 +70,27 @@ Golden rule: **every factual claim resolves to a grepable symbol.** If you can't
 
 ### Commands
 
-**`/ai-native-reframe`** — Mid-session audit. Takes the current AI-system design and produces structured output with five sections: ENGINE, PRESENTATION, BRIDGE, GAPS, 48-HOUR PROTOTYPE.
+| Command | What it does |
+|---|---|
+| `/ship-check` | The whole ship gate, one command. Runs, in order, and refuses to report success if any stage fails: **1. Verify** (repo's own gates — typecheck, lint, FULL test suite, build/export — plus the review/cleanup chain and smoke checks), **2. Red-Team** (adversarial falsification — same `red-team` skill `/red-team` uses standalone, includes the AI-native-coverage and voice-coverage attack lanes), **3. Definition of Done** (fills the ledger from `skills/definition-of-done/SKILL.md`, verdict line first — same skill `/dod` uses standalone), **4. Ship** (pre-merge verdict + automatic merge of this session's isolated PRs). `--no-merge` stops before the merge phase; `--scope=<freeform>` overrides the inferred session intent. |
+| `/red-team [scope]` | Standalone adversarial falsification pass — attacks every "it's done" claim from this session with a disconfirming experiment, fixes what cracks, reports only when clean. Also runs as `/ship-check` Stage 2 — both invoke `skills/red-team/SKILL.md`, one source of truth. |
+| `/dod <feature>` | Standalone Definition-of-Done ledger fill, verdict line first. Also runs as `/ship-check` Stage 3 — both invoke `skills/definition-of-done/SKILL.md`, one source of truth. |
+| `/ai-native-reframe` | Mid-session audit. Takes the current AI-system design and produces structured output with five sections: ENGINE, PRESENTATION, BRIDGE, GAPS, 48-HOUR PROTOTYPE. |
+| `/document-feature-module <target>` | Thin wrapper that invokes the `document-feature-module` skill against a target module. |
 
-**`/document-feature-module <target>`** — Thin wrapper that invokes the `document-feature-module` skill against a target module.
+`/red-team` and `/dod` stay available standalone for sessions that want just one stage — `scripts/check-command-sync.sh` fails the build if either command (or `/ship-check`) drifts out of sync with its source-of-truth skill.
 
 ## Definition of Done
 
-`skills/definition-of-done/SKILL.md` is the ledger every "ship it" must fill: intent, front end, back end, integrations, payments, security, verification, ship, aftercare. `/dod <feature>` prints it with the verdict first. Rows are DONE · N/A · OWNER · NOT DONE, never "deferred".
+`skills/definition-of-done/SKILL.md` is the ledger every "ship it" must fill: intent, front end, back end, integrations, payments, security, verification, ship, aftercare. `/dod <feature>` prints it with the verdict first, and it runs as `/ship-check` Stage 3. Rows are DONE · N/A · OWNER · NOT DONE, never "deferred".
+
+## Red-Team
+
+`skills/red-team/SKILL.md` is the adversarial falsification pass every "it's done" claim must survive: a Claim Ledger, a disconfirming experiment per claim, a hidden-failure sweep (including the AI-native-coverage and voice-coverage attack lanes), and a fix-verify-report loop. `/red-team [scope]` runs it standalone, and it runs as `/ship-check` Stage 2.
 
 ## Roadmap
 
-- **Phase 2** — audit and add (with attribution) a set of currently-held skills: `ui-ux-pro-max`, `/ux-simplify`, `/ship-check`, `/create-command`, `/list-mcps`, `/evaluate-repository`.
+- **Phase 2** — audit and add (with attribution) a set of currently-held skills: `ui-ux-pro-max`, `/ux-simplify`, `/create-command`, `/list-mcps`, `/evaluate-repository`.
 - **Upstream** — propose `designing-ai-systems` as a PR to [Jesse Vincent's `superpowers` plugin](https://github.com/obra/superpowers) for universal distribution.
 - **Content** — turn the two-layer design spec into a blog post / conference talk.
 
