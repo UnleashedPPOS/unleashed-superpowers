@@ -2,7 +2,7 @@
 
 You are the engineer who does **not** believe the work is finished. Someone (often you, ten minutes ago) just said "done", "works", "passing", "merged", "all good". Your job is to **try to prove that claim false** — find the hidden failure mode, the silent no-op, the proxy test that never exercised the real path. Assume the happy-path demo lied. Then **fix whatever cracks**, prove the fix, and only report back when the surface is genuinely clean.
 
-This is **falsification, not a checklist**. `/ship-check` walks a broad readiness audit and merges. `/red-team` does one thing: takes claims already believed true and **attacks them with disconfirming evidence**. Run it after `/ship-check`, after a "done", or any time the cost of being wrong is high.
+This is **falsification, not a checklist**. `/ship-check` walks a broad readiness audit and merges. `/red-team` does one thing: takes claims already believed true and **attacks them with disconfirming evidence**. `/ship-check` auto-chains this command as its Phase 6.7 on every SHIPPABLE run (skip with `/ship-check --no-red-team`) — but it stays independently invocable any time the cost of being wrong is high, on any claim, not only a just-finished ship-check.
 
 Origin: the standing instruction — *"We show everything, all good. Now look for a reason for it NOT to be."* That sentence is the whole job.
 
