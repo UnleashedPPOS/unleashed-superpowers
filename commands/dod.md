@@ -1,5 +1,5 @@
 ---
-description: Fill the Unleashed Definition-of-Done ledger for the current feature/PR and print the verdict line first.
+description: Fill the Unleashed Definition-of-Done ledger for the current feature/PR and print the verdict line first. Also runs as Stage 3 of /ship-check — this command and that stage both invoke the `definition-of-done` skill, so there is one source of truth; edit `skills/definition-of-done/SKILL.md`, never this file's body.
 ---
 
-Load the `definition-of-done` skill from this plugin and produce the ledger for the feature named in `$ARGUMENTS` (or the current branch's diff if none). One row per checklist item, state in caps first (DONE · N/A (why) · OWNER (who, what) · NOT DONE). The first line is the verdict. Never write "deferred".
+Load the `definition-of-done` skill (`skills/definition-of-done/SKILL.md`) from this plugin and produce the ledger for the feature named in `$ARGUMENTS` (or the current branch's diff if none). One row per checklist item, state in caps first (DONE · N/A (why) · OWNER (who, what) · NOT DONE). The first line is the verdict. Never write "deferred".
