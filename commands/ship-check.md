@@ -218,7 +218,7 @@ Commit the lesson separately.
 
 ## Stage 1 gate
 
-Stage 1 is **CLEAN** only if: every Phase 1 section is `✅` or a user-approved deferral, every Phase 2 pass actually ran this session with cited evidence and zero unaddressed Blockers/Importants, Phase 3 smoke checks confirm intended behaviour (or explicitly n/a), and Phase 4 lessons are captured (or explicitly none). If Stage 1 is not CLEAN: **STOP here.** Report exactly what is unresolved and where the fix lives. Do not proceed to Stage 2. Do not report any verdict word (SHIPPABLE, SURVIVED, DONE) for a later stage — there is no later-stage output to report.
+Stage 1 is **CLEAN** only if: every Phase 1 section is `✅` or a user-approved deferral, every Phase 2 pass actually ran this session with cited evidence and zero unaddressed Blockers/Importants, Phase 3 smoke checks confirm intended behaviour (or explicitly n/a), and Phase 4 lessons are captured (or explicitly none). If Stage 1 is not CLEAN: **STOP here.** Report exactly what is unresolved and where the fix lives. (Chat output: the Phase 7 4-line status.) Do not proceed to Stage 2. Do not report any verdict word (SHIPPABLE, SURVIVED, DONE) for a later stage — there is no later-stage output to report.
 
 ---
 
@@ -232,7 +232,7 @@ This run **includes both new attack lanes** the skill's Phase 2 Hidden-Failure S
 
 ## Stage 2 gate
 
-Write the skill's Phase 4 report into the Phase 7 report file (not chat). Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. Do not proceed to Stage 3.
+Write the skill's Phase 4 report into the Phase 7 report file (not chat). Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. (Chat output: the Phase 7 4-line status.) Do not proceed to Stage 3.
 
 ---
 
@@ -254,7 +254,7 @@ Row 7 (Verification) of the ledger references "Ship-check + red-team pass run ag
 
 ## Stage 3 gate
 
-Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, `N/A (why)`, or `OWNER (who, what)`). If `NOT DONE > 0`: **STOP here.** The feature is not shipped — report the verdict line as-is (it already says so) and do not proceed to Stage 4.
+Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, `N/A (why)`, or `OWNER (who, what)`). If `NOT DONE > 0`: **STOP here.** The feature is not shipped — report the verdict line as-is (it already says so) and do not proceed to Stage 4. (Chat output: the Phase 7 4-line status.)
 
 ---
 
@@ -268,7 +268,7 @@ Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLE
 
 - **SHIPPABLE** — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 ledger has `NOT DONE = 0`. The Phase 1.11 isolation verdict is **ISOLATED**. **→ proceed to auto-merge (Phase 6) unless `--no-merge` was passed.** If the isolation verdict is **ENTANGLED**, the verdict is still SHIPPABLE for the *work* but auto-merge is OFF — escalate the merge-scope decision per 1.11 instead of merging.
 - **SHIPPABLE WITH CAVEATS** — the only open items are Zero Residuals exceptions — founder-deferred, founder-hands, or impossible-here (e.g. Stage 3 `OWNER` rows the founder explicitly accepted). Never for work you could have fixed. **→ proceed to auto-merge, surface caveats in final report.**
-- **NOT SHIPPABLE** — any stage above did not reach CLEAN. **→ STOP. Do not merge. Report the blocker and where the fix lives. Wait for explicit user direction.** (In practice you already stopped when the failing stage's gate fired — this line exists so Phase 7's report format has a name for that outcome too.)
+- **NOT SHIPPABLE** — any stage above did not reach CLEAN. **→ STOP. Do not merge. (Chat output: the Phase 7 4-line status.) Report the blocker and where the fix lives. Wait for explicit user direction.** (In practice you already stopped when the failing stage's gate fired — this line exists so Phase 7's report format has a name for that outcome too.)
 
 ## Phase 6 — Auto-Merge Protocol (runs when verdict ≠ NOT SHIPPABLE and `--no-merge` not passed)
 
@@ -329,7 +329,7 @@ The founder reads only the ending. Two outputs:
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
    The report file is not linked in chat; give its path only if the founder asks.
-   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** says what is NOT merged; **Remaining** starts NOT SHIPPABLE and names each blocker in one plain line.
+   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** starts with the state — NOT SHIPPABLE (a stage failed), or SHIPPABLE BUT NOT MERGED (ENTANGLED branch, merge failure, `--no-merge`) — then each blocker in one plain line.
 
 Full-report format (file only):
 
