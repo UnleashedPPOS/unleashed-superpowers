@@ -29,9 +29,8 @@ The ONLY things allowed to stay open:
 2. Needs the founder's hands: merge click, credential/sign-in, store step, a genuine product/design decision → the
    "Only you can do" list with a deep link (ask the design question once, with your recommended default).
 3. Physically impossible from this environment (blocked host, device-only step) → local-ops list with the exact command.
-**Context size / token budget is NEVER a reason to defer or skip.** If the session is large: fan the remaining fixes
-out to Sonnet sub-agents, or hand off with the complete remaining list as the next session's mandatory work — never
-relabel unfinished work as "follow-ups". Don't tell the founder you're "keeping the session small".
+**Context size / token budget is NEVER a reason to defer or skip.** If the session is large: keep going (auto-compact handles
+size) and fan big fixes out to Sonnet sub-agents. Never stop mid-ship-check or relabel unfinished work as "follow-ups". Don't tell the founder you're "keeping the session small".
 
 ## Prime Directive: Evidence Before Assertions
 No ✅ without proof: command output, a file quote, a DB result, a deploy ID or a SHA. Didn't run it → ⚠️. A ⚠️ is acceptable; a false ✅ is a firing offence. Cite the proving artefact on one line before each checkmark.
