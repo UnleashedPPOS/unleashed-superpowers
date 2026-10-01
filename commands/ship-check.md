@@ -232,7 +232,7 @@ This run **includes both new attack lanes** the skill's Phase 2 Hidden-Failure S
 
 ## Stage 2 gate
 
-Print the skill's Phase 4 report. Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. Do not proceed to Stage 3.
+Write the skill's Phase 4 report into the Phase 7 report file (not chat). Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. Do not proceed to Stage 3.
 
 ---
 
@@ -240,7 +240,7 @@ Print the skill's Phase 4 report. Stage 2 is **CLEAN** only if the skill's own V
 
 Load the `definition-of-done` skill (`skills/definition-of-done/SKILL.md`) from this plugin and produce the ledger for the feature/session scope, exactly as `/dod` does standalone — one row per checklist item, state in caps first (`DONE` · `N/A (why)` · `OWNER (who, what)`; never "deferred"). This is the same skill `/dod` invokes; do not re-derive its rows here.
 
-Print the skill's own output format **with the verdict line FIRST**, per the skill's own contract:
+Write the skill's own output format into the Phase 7 report file (not chat) **with the verdict line FIRST**, per the skill's own contract:
 
 ```
 DoD · <feature>  —  DONE 31 · N/A 4 · OWNER 3 · NOT DONE 0
@@ -324,11 +324,11 @@ The founder reads only the ending. Two outputs:
 2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
    ```
    **Done:** <what shipped> · merged <PR link> · live <yes/no + where>
-   **Remaining:** No known bugs, nothing left — or each open item + why (NOT SHIPPABLE / WITH CAVEATS say so here)
+   **Remaining:** No known bugs, nothing left — ONLY if the verdict is SHIPPABLE; otherwise start with NOT SHIPPABLE / WITH CAVEATS, then each open item + why
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
-   Don't link the report file unless the verdict isn't SHIPPABLE.
+   The report file is not linked in chat; give its path only if the founder asks.
 
 Full-report format (file only):
 
