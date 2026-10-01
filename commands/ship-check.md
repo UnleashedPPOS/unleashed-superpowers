@@ -187,6 +187,13 @@ This is the structured "I finished — now prove it's good" loop; it is part of 
 ### 2.D — Synthesis gate
 Merge all findings into one list, dedupe, and resolve: every Blocker fixed + re-tested, every Important and every Nit fixed + re-tested (Zero Residuals — only the three directive exceptions may remain, each listed). Open residual count = 0. The Phase 7 Automated-Passes table gets one row per pass above with a **cited artefact** (agent id, quoted finding count, or fix commit SHA). **A pass with no cited evidence did not run — and Stage 1 cannot be marked clean until it does.**
 
+### 2.E — Fix verification (who checks the fixes)
+Fixes are new code and get the same scrutiny as the original work — the author re-running tests is not enough.
+1. Record `FIX_BASE` = the HEAD SHA before the first fix commit of 2.B–2.D. If there are no fix commits, write "no fixes" and skip.
+2. Dispatch ONE fresh reviewer (Sonnet, no prior context) with only: the findings list and `git diff FIX_BASE..HEAD`. Its questions: does each fix actually resolve its finding (cite file:line)? Did any fix break behaviour, tests, types, or another finding's fix? Anything the fix diff added that no finding asked for?
+3. Any new finding → fix, re-test, and repeat 2.E on the new diff. **Max 3 rounds**; still finding issues after round 3 → Stage 1 is NOT CLEAN, stop and report.
+4. Cite the reviewer agent id + round count in the Automated Passes table (`fix verification` row).
+
 ## Phase 3 — Smoke Verification (mandatory if any code changed)
 
 Trust nothing. Prove it.
@@ -255,6 +262,8 @@ Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, 
 
 ## Phase 5 — Pre-Merge Final Verdict
 
+**Last-fix re-check (first step once Stages 1–3 are clean):** if Stage 2 or Stage 3 added any commit after the 2.E review, run 2.E again on `git diff <last-2.E-reviewed-SHA>..HEAD` (same 3-round cap). Still finding issues after round 3 → verdict is **NOT SHIPPABLE**. Nothing merges with an unreviewed fix in it.
+
 Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 NOT DONE = 0 — or this phase does not run at all** (you already stopped at the failing stage above; this section only applies once you actually reach it).
 
 - **SHIPPABLE** — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 ledger has `NOT DONE = 0`. The Phase 1.11 isolation verdict is **ISOLATED**. **→ proceed to auto-merge (Phase 6) unless `--no-merge` was passed.** If the isolation verdict is **ENTANGLED**, the verdict is still SHIPPABLE for the *work* but auto-merge is OFF — escalate the merge-scope decision per 1.11 instead of merging.
@@ -307,7 +316,24 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 - Trigger fresh runs of any drift-check workflows if their last run was on a stale SHA: `gh workflow run "Migration Drift Check" --ref main`, `gh workflow run "Deploy Migrations" --ref main`, `gh workflow run "Supabase Drift Check" --ref main`. Confirm they go green.
 - Append `.claude/agent-summary.md` with section `# /ship-check auto-merge — <date>` containing each merged PR# + squash SHA + content-proof receipts.
 
-## Phase 7 — Final Report (exact format)
+## Phase 7 — Final Report
+
+The founder reads only the ending. Two outputs:
+
+1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
+2. **Chat → at most 8 lines**, nothing else:
+   ```
+   **Ship-check: <feature>** — SHIPPABLE / WITH CAVEATS / NOT SHIPPABLE
+   **Done:** <what shipped> · merged <PR links + squash SHA> · live <yes/no + where>
+   **Fixed during check:** <N findings fixed; fixes re-reviewed in 2.E: <rounds>, clean>
+   **Ship-checked:** yes — confidence <high/medium/low + one-line why>
+   **Not done:** <each open item + why, or "none">
+   **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
+   **Needs you:** <only-you steps with deep links, or omit>
+   Full report: <link to the file>
+   ```
+
+Full-report format (file only):
 
 ```markdown
 # Ship-Check: <feature or branch>
@@ -348,6 +374,7 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 | voice-coverage-audit (doc) | `/voice-coverage-audit <module>` | <ran? matrix refreshed> | <doc SHA / n/a> |
 | docs sync | `doc-updater` / `/update-docs` | <ran?> | <docs SHA / n/a> |
 | superpowers review loop | `requesting-/receiving-code-review` | <ran?> | triage outcome |
+| fix verification | fresh reviewer on `FIX_BASE..HEAD` (2.E + Phase 5 re-check) | <agent id + rounds> | <fix SHA / "no fixes"> |
 
 ## Smoke
 - Edge fn logs: <2xx timestamp or "0 invocations yet">

@@ -68,6 +68,8 @@ if ! grep -q "skills/definition-of-done/SKILL.md" commands/ship-check.md; then
   fail=1
 fi
 
+bash scripts/build-cloud-manifest.sh --check || fail=1
+
 if [ "$fail" -eq 0 ]; then
   echo "OK: red-team / definition-of-done stay single-sourced in skills/, commands stay thin wrappers or references."
 else
