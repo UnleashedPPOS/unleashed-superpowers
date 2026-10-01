@@ -31,6 +31,15 @@ Before any checkmark, write one line citing the artefact that proved it (e.g. `b
 - `feedback_merge_with_failing_checks.md` — never defer failing/pending checks. Required CI green at merge time.
 - `feedback_senior_dev.md` — apply obvious best-practice fixes autonomously; ask only on real design choices.
 
+## Zero Residuals Directive
+
+The point of /ship-check is to leave **nothing open**. Fix every finding now — Blockers, Importants, **Nits**, refactor-cleaner items, UX friction, doc gaps, flaky tests, residuals. Only three exceptions, each listed in the final report:
+1. The founder explicitly said defer it.
+2. It needs the founder's hands (credential, store step, design decision) → "Only you can do" list with a deep link.
+3. It's impossible from this environment → local-ops list.
+
+Context size is never a reason to defer: keep going (auto-compact handles size) and fan big fixes out to Sonnet sub-agents. Never stop mid-ship-check or relabel unfinished work as "follow-ups". Don't tell the founder you're "keeping the session small".
+
 ---
 
 # Stage 1 — Verify
@@ -172,11 +181,11 @@ After the reviewers report, apply fixes. These edit the working tree, so they ru
 ### 2.C — Superpowers review loop (the explicit superpowers entwine)
 Wrap the whole pass in the superpowers review discipline:
 - `superpowers:requesting-code-review` skill to frame what was built and what to scrutinise before merge, and
-- `superpowers:receiving-code-review` skill to triage the combined findings from 2.A into fix-now vs defer.
+- `superpowers:receiving-code-review` skill to triage the combined findings from 2.A — every finding is fix-now (Zero Residuals); only the three directive exceptions may be listed instead.
 This is the structured "I finished — now prove it's good" loop; it is part of the chain, not optional decoration.
 
 ### 2.D — Synthesis gate
-Merge all findings into one list, dedupe, and resolve: every Blocker fixed + re-tested, every real-impact Important fixed or explicitly user-deferred, Nits batched/parked. The Phase 7 Automated-Passes table gets one row per pass above with a **cited artefact** (agent id, quoted finding count, or fix commit SHA). **A pass with no cited evidence did not run — and Stage 1 cannot be marked clean until it does.**
+Merge all findings into one list, dedupe, and resolve: every Blocker fixed + re-tested, every Important and every Nit fixed + re-tested (Zero Residuals — only the three directive exceptions may remain, each listed). Open residual count = 0. The Phase 7 Automated-Passes table gets one row per pass above with a **cited artefact** (agent id, quoted finding count, or fix commit SHA). **A pass with no cited evidence did not run — and Stage 1 cannot be marked clean until it does.**
 
 ## Phase 3 — Smoke Verification (mandatory if any code changed)
 
@@ -249,7 +258,7 @@ Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, 
 Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 NOT DONE = 0 — or this phase does not run at all** (you already stopped at the failing stage above; this section only applies once you actually reach it).
 
 - **SHIPPABLE** — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 ledger has `NOT DONE = 0`. The Phase 1.11 isolation verdict is **ISOLATED**. **→ proceed to auto-merge (Phase 6) unless `--no-merge` was passed.** If the isolation verdict is **ENTANGLED**, the verdict is still SHIPPABLE for the *work* but auto-merge is OFF — escalate the merge-scope decision per 1.11 instead of merging.
-- **SHIPPABLE WITH CAVEATS** — non-blocking gaps exist but were user-approved (e.g. Stage 3 `OWNER` rows the user has explicitly accepted as follow-up, not blocking this ship). **→ proceed to auto-merge, surface caveats in final report.**
+- **SHIPPABLE WITH CAVEATS** — the only open items are Zero Residuals exceptions — founder-deferred, founder-hands, or impossible-here (e.g. Stage 3 `OWNER` rows the founder explicitly accepted). Never for work you could have fixed. **→ proceed to auto-merge, surface caveats in final report.**
 - **NOT SHIPPABLE** — any stage above did not reach CLEAN. **→ STOP. Do not merge. Report the blocker and where the fix lives. Wait for explicit user direction.** (In practice you already stopped when the failing stage's gate fired — this line exists so Phase 7's report format has a name for that outcome too.)
 
 ## Phase 6 — Auto-Merge Protocol (runs when verdict ≠ NOT SHIPPABLE and `--no-merge` not passed)
