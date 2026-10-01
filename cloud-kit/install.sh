@@ -5,7 +5,9 @@
 # Cloud sessions never see ~/.claude from the Mac and don't install repo-declared
 # plugins, so the cloud environment's setup script runs this once per VM image:
 #
-#   curl -fsSL https://raw.githubusercontent.com/UnleashedPPOS/unleashed-superpowers/main/cloud-kit/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/UnleashedPPOS/unleashed-superpowers/main/cloud-kit/install.sh | bash -s -- --force
+#
+# (--force because the setup script runs before the session starts, so CLAUDE_CODE_REMOTE may not be set yet.)
 #
 # It also adds a SessionStart hook that re-runs itself in the background, so each
 # new session picks up the latest kit from main. Fetches only from
