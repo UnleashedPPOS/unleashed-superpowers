@@ -218,7 +218,7 @@ Commit the lesson separately.
 
 ## Stage 1 gate
 
-Stage 1 is **CLEAN** only if: every Phase 1 section is `✅` or a user-approved deferral, every Phase 2 pass actually ran this session with cited evidence and zero unaddressed Blockers/Importants, Phase 3 smoke checks confirm intended behaviour (or explicitly n/a), and Phase 4 lessons are captured (or explicitly none). If Stage 1 is not CLEAN: **STOP here.** Report exactly what is unresolved and where the fix lives. Do not proceed to Stage 2. Do not report any verdict word (SHIPPABLE, SURVIVED, DONE) for a later stage — there is no later-stage output to report.
+Stage 1 is **CLEAN** only if: every Phase 1 section is `✅` or a user-approved deferral, every Phase 2 pass actually ran this session with cited evidence and zero unaddressed Blockers/Importants, Phase 3 smoke checks confirm intended behaviour (or explicitly n/a), and Phase 4 lessons are captured (or explicitly none). If Stage 1 is not CLEAN: **STOP here.** Report exactly what is unresolved and where the fix lives. (Chat output: the Phase 7 4-line status.) Do not proceed to Stage 2. Do not report any verdict word (SHIPPABLE, SURVIVED, DONE) for a later stage — there is no later-stage output to report.
 
 ---
 
@@ -232,7 +232,7 @@ This run **includes both new attack lanes** the skill's Phase 2 Hidden-Failure S
 
 ## Stage 2 gate
 
-Print the skill's Phase 4 report. Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. Do not proceed to Stage 3.
+Write the skill's Phase 4 report into the Phase 7 report file (not chat). Stage 2 is **CLEAN** only if the skill's own Verdict line reads **SURVIVED** (every claim attacked, every MINE-TO-FIX crack fixed + merged + re-proven, every OWNED-ELSEWHERE crack confirmed covered). If the verdict is **NOT SURVIVED** (an unresolved `🔴 CRACKED` claim with no genuine-external blocker covering it): **STOP here.** Report the crack and why it isn't fixed yet. (Chat output: the Phase 7 4-line status.) Do not proceed to Stage 3.
 
 ---
 
@@ -240,7 +240,7 @@ Print the skill's Phase 4 report. Stage 2 is **CLEAN** only if the skill's own V
 
 Load the `definition-of-done` skill (`skills/definition-of-done/SKILL.md`) from this plugin and produce the ledger for the feature/session scope, exactly as `/dod` does standalone — one row per checklist item, state in caps first (`DONE` · `N/A (why)` · `OWNER (who, what)`; never "deferred"). This is the same skill `/dod` invokes; do not re-derive its rows here.
 
-Print the skill's own output format **with the verdict line FIRST**, per the skill's own contract:
+Write the skill's own output format into the Phase 7 report file (not chat) **with the verdict line FIRST**, per the skill's own contract:
 
 ```
 DoD · <feature>  —  DONE 31 · N/A 4 · OWNER 3 · NOT DONE 0
@@ -254,7 +254,7 @@ Row 7 (Verification) of the ledger references "Ship-check + red-team pass run ag
 
 ## Stage 3 gate
 
-Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, `N/A (why)`, or `OWNER (who, what)`). If `NOT DONE > 0`: **STOP here.** The feature is not shipped — report the verdict line as-is (it already says so) and do not proceed to Stage 4.
+Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, `N/A (why)`, or `OWNER (who, what)`). If `NOT DONE > 0`: **STOP here.** The feature is not shipped — report the verdict line as-is (it already says so) and do not proceed to Stage 4. (Chat output: the Phase 7 4-line status.)
 
 ---
 
@@ -268,14 +268,14 @@ Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLE
 
 - **SHIPPABLE** — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 ledger has `NOT DONE = 0`. The Phase 1.11 isolation verdict is **ISOLATED**. **→ proceed to auto-merge (Phase 6) unless `--no-merge` was passed.** If the isolation verdict is **ENTANGLED**, the verdict is still SHIPPABLE for the *work* but auto-merge is OFF — escalate the merge-scope decision per 1.11 instead of merging.
 - **SHIPPABLE WITH CAVEATS** — the only open items are Zero Residuals exceptions — founder-deferred, founder-hands, or impossible-here (e.g. Stage 3 `OWNER` rows the founder explicitly accepted). Never for work you could have fixed. **→ proceed to auto-merge, surface caveats in final report.**
-- **NOT SHIPPABLE** — any stage above did not reach CLEAN. **→ STOP. Do not merge. Report the blocker and where the fix lives. Wait for explicit user direction.** (In practice you already stopped when the failing stage's gate fired — this line exists so Phase 7's report format has a name for that outcome too.)
+- **NOT SHIPPABLE** — any stage above did not reach CLEAN. **→ STOP. Do not merge. (Chat output: the Phase 7 4-line status.) Report the blocker and where the fix lives. Wait for explicit user direction.** (In practice you already stopped when the failing stage's gate fired — this line exists so Phase 7's report format has a name for that outcome too.)
 
 ## Phase 6 — Auto-Merge Protocol (runs when verdict ≠ NOT SHIPPABLE and `--no-merge` not passed)
 
 You merge the open PRs from this session yourself. The user does not click anything.
 
 ### 6.0 Hard precondition — the Phase 1.11 isolation verdict MUST be ISOLATED
-Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes). Merging an integration/shared branch to main as a side effect of landing your fix ships other people's unreviewed work to production and may race active commits. ENTANGLED → you already escalated the scope decision in 1.11; obey the user's choice (open-PR-and-hold / track-owner-merges / explicit merge-the-whole-track). Auto-merge only proceeds for genuinely isolated work.
+Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes). Merging an integration/shared branch to main as a side effect of landing your fix ships other people's unreviewed work to production and may race active commits. ENTANGLED → you already escalated the scope decision in 1.11; obey the user's choice (open-PR-and-hold / track-owner-merges / explicit merge-the-whole-track). Auto-merge only proceeds for genuinely isolated work. (Chat output: the Phase 7 4-line status.)
 
 ### 6.1 Identify in-scope PRs
 - `gh pr list --state open --search "author:@me head:<this-session's-branch>"` OR (when working without a head filter) cross-reference `git log <session-start-sha>..HEAD` with `gh pr list --state open --json number,headRefName`. Only merge PRs **whose branch matches a commit you authored in this session** AND whose commit set is yours alone (re-check authorship per 1.11). Never merge unrelated open PRs, and never merge a PR that also carries other authors' commits without explicit user go-ahead.
@@ -286,7 +286,7 @@ Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicat
    ```bash
    git merge-tree $(git merge-base origin/main origin/<branch>) origin/main origin/<branch> | grep -E 'CONFLICT|<<<<<<<' | head -3
    ```
-   Empty output = clean. Hits = STOP, escalate to the user; do not force-resolve.
+   Empty output = clean. Hits = STOP, escalate to the user; do not force-resolve. (Chat output: the Phase 7 4-line status.)
 3. **Squash merge:**
    ```bash
    gh pr merge <N> --squash --repo <owner>/<repo>
@@ -296,7 +296,7 @@ Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicat
    git fetch && git merge-base --is-ancestor <squash-sha> origin/main && echo IN_MAIN || echo MISSING
    git grep <key-symbol-from-PR-diff> origin/main -- <relevant-file>
    ```
-   Both must succeed. If either fails → escalate immediately.
+   Both must succeed. If either fails → escalate immediately. (Chat output: the Phase 7 4-line status.)
 
 ### 6.3 When CI is still pending at audit time
 Do not merge with pending checks. Two paths:
@@ -321,17 +321,15 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 The founder reads only the ending. Two outputs:
 
 1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
-2. **Chat → at most 8 lines**, nothing else:
+2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
    ```
-   **Ship-check: <feature>** — SHIPPABLE / WITH CAVEATS / NOT SHIPPABLE
-   **Done:** <what shipped> · merged <PR links + squash SHA> · live <yes/no + where>
-   **Fixed during check:** <N findings fixed; fixes re-reviewed in 2.E: <rounds>, clean>
-   **Ship-checked:** yes — confidence <high/medium/low + one-line why>
-   **Not done:** <each open item + why, or "none">
+   **Done:** <what shipped> · merged <PR link, or "not merged"> · live <yes/no + where>
+   **Remaining:** No known bugs, nothing left — ONLY if SHIPPABLE and merged; otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED, then each open item + why
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
-   **Needs you:** <only-you steps with deep links, or omit>
-   Full report: <link to the file>
+   **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
+   The report file is not linked in chat; give its path only if the founder asks.
+   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** starts with the state — NOT SHIPPABLE (a stage failed), or SHIPPABLE BUT NOT MERGED (ENTANGLED branch, merge failure, `--no-merge`) — then each blocker in one plain line.
 
 Full-report format (file only):
 

@@ -139,8 +139,8 @@ def main():
         print(json.dumps({
             "decision": "block",
             "reason": "[auto-ship-check] Code changed this turn and /ship-check has not run. "
-                      "Run the ship-check skill now (it includes red-team), then end with the short "
-                      "Done / Not done / Ship-checked / Proof summary.",
+                      "Run the ship-check skill now (it includes red-team), then end with the ≤4-line "
+                      "Done / Remaining / Proof / Needs you summary.",
         }))
 
 
