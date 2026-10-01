@@ -20,6 +20,19 @@ Flags:
 1 **Built**: matches the Phase 0 intent, nothing silently descoped · 2 **Correct**: toolchain green (1.1) + both review lenses + security actually ran, 0 open Blockers (2) · 3 **Safe**: no secrets, no new security/RLS/CORS gap, no untested destructive action (1.2–1.4) · 4 **Usable**: a11y, error/empty/loading states, no dead ends (1.5–1.6) · 5 **Clean**: no dead code, docs updated, history matches intent (1.7–1.9) · 6 **Merged**: ISOLATED PR, CI green, squash, content proof (1.11, 6) · 7 **Deployed**: live artifact = merge SHA (6.6) · 8 **Exercised** once on the real path after deploy (3, 6.6) · 9 **Survived falsification** (6.7).
 Any unmet item is a ⚠️/❌ you fix, or a user-approved Deferred entry. Never a silent gap.
 
+## Zero Residuals Directive (founder, 2026-10-01 — overrides anything below that says "park"/"defer"/"batch later")
+Ship-check's job is to leave **nothing open**. Every finding — Blocker, Important, **Nit**, refactor-cleaner item,
+UX friction, doc gap, flaky test, small follow-up, "non-blocking residual" — in or adjacent to this session's work
+gets **fixed now**, committed, tested. "Follow-up PR", "out of scope for this pass", "parked in future.md" are not outcomes.
+The ONLY things allowed to stay open:
+1. The founder explicitly said "defer X" (quote them).
+2. Needs the founder's hands: merge click, credential/sign-in, store step, a genuine product/design decision → the
+   "Only you can do" list with a deep link (ask the design question once, with your recommended default).
+3. Physically impossible from this environment (blocked host, device-only step) → local-ops list with the exact command.
+**Context size / token budget is NEVER a reason to defer or skip.** If the session is large: fan the remaining fixes
+out to Sonnet sub-agents, or hand off with the complete remaining list as the next session's mandatory work — never
+relabel unfinished work as "follow-ups". Don't tell the founder you're "keeping the session small".
+
 ## Prime Directive: Evidence Before Assertions
 No ✅ without proof: command output, a file quote, a DB result, a deploy ID or a SHA. Didn't run it → ⚠️. A ⚠️ is acceptable; a false ✅ is a firing offence. Cite the proving artefact on one line before each checkmark.
 
@@ -90,16 +103,16 @@ A pass counts **only** if its agent ran **in this conversation** and you quote i
 Anti-watchdog: **≤3 reviewers per wave** (4+ trips the watchdog), or two waves. ≤2 background subagents.
 
 ### 2.B Cleanup + fix (mutating, sequential, separate commits; never smuggle a fix into an unrelated commit)
-5. **Simplify:** the `/simplify` skill on changed files, then action refactor-cleaner's findings (remove if cheap; park large consolidations in the repo's tracking doc, e.g. `future.md`, with a reason). Commit `refactor(...)`.
-6. **Correctness fix:** `/code-review --fix` to apply the 2.A findings. Fix every Blocker + real-impact Important. Nits: one batched commit or deferred with a one-liner. Re-run tests. Commit `fix(...)`.
-7. **UX friction:** the repo's UX-simplify skill (advisory) on the primary pages touched, or a manual pass that surfaces the top 1–2 issues. Park the rest in the tracking doc.
+5. **Simplify:** the `/simplify` skill on changed files, then action ALL refactor-cleaner findings on touched code (large consolidations too — fan out to a Sonnet sub-agent if big; only a genuine design decision goes to the founder). Commit `refactor(...)`.
+6. **Correctness fix:** `/code-review --fix` to apply the 2.A findings. Fix every Blocker, Important AND Nit (nits in one batched commit — never deferred). Re-run tests. Commit `fix(...)`.
+7. **UX friction:** the repo's UX-simplify skill (advisory) on the primary pages touched, or a manual pass. Fix every issue found on the touched pages; only genuine design decisions go to the founder.
 8. **Docs sync:** `doc-updater` agent (`model: "sonnet"`), `/update-docs` or `/document-feature-module <module>`, covering module docs + any tracking doc (e.g. the Voice Coverage Matrix). Commit `docs(...)`.
 
 ### 2.C Superpowers review loop (part of the chain, not decoration)
-`superpowers:requesting-code-review` frames what was built and what to scrutinise. `superpowers:receiving-code-review` triages the combined 2.A findings into fix-now vs defer.
+`superpowers:requesting-code-review` frames what was built and what to scrutinise. `superpowers:receiving-code-review` triages the combined 2.A findings: verify each is real (push back on wrong ones with evidence), then fix-now. "Defer" only per the Zero Residuals Directive.
 
 ### 2.D Synthesis gate (Opus, top session)
-Merge + dedupe all findings. Every Blocker is fixed + re-tested. Every real-impact Important is fixed or user-deferred. Nits are batched or parked. Phase 7's Automated Passes table gets one row per pass with a **cited artefact** (agent id, quoted finding count or fix SHA). No evidence = didn't run = no SHIPPABLE.
+Merge + dedupe all findings. Every Blocker is fixed + re-tested. Every Important and Nit is fixed (or founder-deferred per Zero Residuals). Open residual count = 0. Phase 7's Automated Passes table gets one row per pass with a **cited artefact** (agent id, quoted finding count or fix SHA). No evidence = didn't run = no SHIPPABLE.
 
 ---
 
@@ -120,7 +133,7 @@ Append to `tasks/lessons.md`, commit separately:
 
 ## Phase 5: Pre-merge verdict
 - **SHIPPABLE**: all Phase 1 ✅ or user-Deferred; Phase 2 passes **actually ran** (cited), 0 unaddressed Blockers/Importants; Phase 3 confirms behaviour; Phase 4 done. 1.11 = ISOLATED → Phase 6 (unless `--no-merge`). If ENTANGLED, the work is SHIPPABLE but auto-merge is OFF; escalate per 1.11.
-- **SHIPPABLE WITH CAVEATS**: non-blocking gaps the user approved → merge and surface the caveats.
+- **SHIPPABLE WITH CAVEATS**: only for items the founder explicitly deferred or that need their hands (Zero Residuals 1–2) → merge and surface them. Never for work you chose not to do.
 - **NOT SHIPPABLE**: any Blocker remains → STOP. Don't merge. Report the blocker and where its fix lives, then wait for the user.
 
 ## Phase 6: Auto-merge (verdict ≠ NOT SHIPPABLE, no `--no-merge`)
@@ -140,7 +153,7 @@ Runs on SHIPPABLE / WITH CAVEATS unless `--no-merge` or `--no-red-team`. Auditin
 ---
 
 ## Hard rules (each is enforced in the phase cited)
-Evidence or ⚠️; never batch-skip with "looks fine" (Prime) · never invent work, extras go to Deferred · fix > flag for cheap/obvious items, ask only on design calls (senior-dev) · one concern per commit · whole review chain every time, never self-review (2) · reviewers on sonnet with ≤300-word returns, Opus for synthesis/verdict + safety-critical security (Model routing) · fan out from the top session, never a self-spawning orchestrator (2.A) · never nest `Agent` `isolation:"worktree"` from a non-git cwd: `git worktree add` yourself and pass the path · topology before merge, auto-merge only if ISOLATED (1.11) · empty checks ≠ green (1.11) · merge-tree exit code + ancestor + content grep, never `mergeable` (6.2) · stop at NOT SHIPPABLE whatever colour CI is (5) · scope = THIS session · merged ≠ shipped (6.6) · anti-watchdog on every subagent: tight brief, hard poll caps, incremental summary writes, pre-baked diagnosis.
+Evidence or ⚠️; never batch-skip with "looks fine" (Prime) · no unrelated new features, but every crack/residual in or adjacent to this session's work is fixed now (Zero Residuals) · context size never justifies deferring — delegate or hand off the full list · fix > flag for cheap/obvious items, ask only on design calls (senior-dev) · one concern per commit · whole review chain every time, never self-review (2) · reviewers on sonnet with ≤300-word returns, Opus for synthesis/verdict + safety-critical security (Model routing) · fan out from the top session, never a self-spawning orchestrator (2.A) · never nest `Agent` `isolation:"worktree"` from a non-git cwd: `git worktree add` yourself and pass the path · topology before merge, auto-merge only if ISOLATED (1.11) · empty checks ≠ green (1.11) · merge-tree exit code + ancestor + content grep, never `mergeable` (6.2) · stop at NOT SHIPPABLE whatever colour CI is (5) · scope = THIS session · merged ≠ shipped (6.6) · anti-watchdog on every subagent: tight brief, hard poll caps, incremental summary writes, pre-baked diagnosis.
 
 ## When to invoke
 At the end of any session that built or materially changed a feature, **before** declaring it done. Long sessions: `everything-claude-code:strategic-compact` mid-way so Phase 0 keeps the intent. `--task` is a mid-session checkpoint, never a substitute.
