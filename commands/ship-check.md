@@ -300,7 +300,7 @@ Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicat
 
 ### 6.3 When CI is still pending at audit time
 Do not merge with pending checks. Two paths:
-- **Inline wait** (preferred when ≤3 min): poll `gh pr checks <N>` every 60s up to 5 polls. If green, merge. If still pending, dispatch a watcher subagent (see 6.4).
+- **Inline wait** (preferred when ≤3 min): poll `gh pr checks <N>` every 60s up to 5 polls. If green, merge. If still pending, dispatch a watcher subagent (see 6.4). (Chat output: the Phase 7 4-line status.)
 - **Watcher subagent** (for longer waits): dispatch ONE tight-scope subagent with this exact shape:
   - Hard cap: 10 polls of 60s each.
   - Incremental `.claude/agent-summary.md` writes after each merge.
@@ -313,7 +313,7 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 
 ### 6.5 Post-merge close-out
 - Verify final `gh pr list --state open` shows zero in-scope PRs remaining.
-- Trigger fresh runs of any drift-check workflows if their last run was on a stale SHA: `gh workflow run "Migration Drift Check" --ref main`, `gh workflow run "Deploy Migrations" --ref main`, `gh workflow run "Supabase Drift Check" --ref main`. Confirm they go green.
+- Trigger fresh runs of any drift-check workflows if their last run was on a stale SHA: `gh workflow run "Migration Drift Check" --ref main`, `gh workflow run "Deploy Migrations" --ref main`, `gh workflow run "Supabase Drift Check" --ref main`. Confirm they go green. (Chat output: the Phase 7 4-line status.)
 - Append `.claude/agent-summary.md` with section `# /ship-check auto-merge — <date>` containing each merged PR# + squash SHA + content-proof receipts.
 
 ## Phase 7 — Final Report
@@ -321,15 +321,15 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 The founder reads only the ending. Two outputs:
 
 1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
-2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
+2. **Chat → at most 4 lines**, nothing else. Never list findings that were FIXED, fixes or review rounds in chat (anything still unfixed goes in Remaining) — the founder only wants the end state:
    ```
    **Done:** <what shipped> · merged <PR link, or "not merged"> · live <yes/no + where>
-   **Remaining:** No known bugs, nothing left — ONLY if SHIPPABLE and merged; otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED, then each open item + why
+   **Remaining:** No known bugs, nothing left — ONLY if SHIPPABLE, merged, and post-merge checks/deploy green; otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED / MERGED BUT POST-MERGE FAILED, then every open item + why (this line may run past the 4-line cap — never drop an open item)
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
    The report file is not linked in chat; give its path only if the founder asks.
-   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** starts with the state — NOT SHIPPABLE (a stage failed), or SHIPPABLE BUT NOT MERGED (ENTANGLED branch, merge failure, `--no-merge`) — then each blocker in one plain line.
+   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** follows the definition above — the state first (NOT SHIPPABLE = a stage failed; SHIPPABLE BUT NOT MERGED = ENTANGLED / merge failure / `--no-merge`; MERGED BUT POST-MERGE FAILED = 6.5 workflows or deploy red), then every open item + why.
 
 Full-report format (file only):
 

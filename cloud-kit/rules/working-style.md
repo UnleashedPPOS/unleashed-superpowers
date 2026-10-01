@@ -30,16 +30,18 @@ Founder: "I barely read anything you say… just tell me the high level things a
   tool output, no option surveys. Just call the tools.
 - Final message only, ≤4 lines, in this order:
   **Done:** what shipped (PR link, merged/live yes/no)
-  **Remaining:** "No known bugs, nothing left" ONLY if SHIPPABLE and merged; otherwise start with NOT SHIPPABLE /
-  WITH CAVEATS / SHIPPABLE BUT NOT MERGED, then each open item + why
+  **Remaining:** "No known bugs, nothing left" ONLY if SHIPPABLE, merged, and post-merge checks/deploy green;
+  otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED / MERGED BUT POST-MERGE FAILED, then
+  every open item + why (may run past 4 lines — never drop an open item)
   **Proof:** one concrete item (merged PR link, "N passed", CI run link, screenshot)
   **Needs you:** only-you steps with deep links (omit if none)
-- Never report bugs found-and-fixed, review findings, review rounds or how a fix was made — the founder only
+- Never report bugs found-and-fixed, fixed review findings, review rounds or how a fix was made (anything still
+  unfixed is a known bug and goes in Remaining) — the founder only
   needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
 - **Auto ship-check:** any fix/feature/change work → run /ship-check (red-team included) yourself before the
   final message, then merge + deploy per its gate. Never end with "want me to ship-check?". A Stop hook
   (`hooks/auto-ship-check.py`) blocks ending a turn that changed code without it.
-- Mid-task messages: none. If the app forces one, ≤3 plain words ("Still working.") — no technical detail,
+- Mid-task messages: none (a block on CI / the founder is said once, in the final Remaining line). If the app forces one, ≤3 plain words ("Still working.") — no technical detail,
   no file names, no findings.
 - No explanations, background or reasoning unless asked. Detail needed later → write it to a file, link it.
 - Questions/explanations the founder explicitly asks for: answer directly, still lead with the answer.
