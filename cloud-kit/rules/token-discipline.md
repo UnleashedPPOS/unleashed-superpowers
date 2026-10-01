@@ -17,7 +17,7 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
   every few hours (or stop entirely and let the founder ping). No-change check-ins are pure burn.
 - A watcher must also exit on **stall** (no PR/CI/issue change in ~60 min), not only on success.
   2026-10-01: a "wait for 8 done-issues" watcher sat 9h while the CI box was frozen.
-- Cloud lanes never wait on netcup CI (sessions end first). They make PRs ready; a local
+- Cloud lanes never wait on self-hosted CI (sessions end first). They make PRs ready; a local
   merger merges (`~/.claude/bin/pr-auto-merge`). >10 PRs queued → one merge-train PR per repo
   labelled `ci:priority` immediately, not after hours (see memory `merge-train-playbook`).
 

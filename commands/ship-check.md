@@ -262,7 +262,7 @@ Stage 3 is **CLEAN** only if `NOT DONE = 0` in the ledger (every row is `DONE`, 
 
 ## Phase 5 — Pre-Merge Final Verdict
 
-**Last-fix re-check (runs first):** if Stage 2 or Stage 3 added any commit after the 2.E review, run 2.E again on `git diff <last-2.E-reviewed-SHA>..HEAD` (same 3-round cap). Nothing merges with an unreviewed fix in it.
+**Last-fix re-check (first step once Stages 1–3 are clean):** if Stage 2 or Stage 3 added any commit after the 2.E review, run 2.E again on `git diff <last-2.E-reviewed-SHA>..HEAD` (same 3-round cap). Still finding issues after round 3 → verdict is **NOT SHIPPABLE**. Nothing merges with an unreviewed fix in it.
 
 Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLEAN, Stage 2 SURVIVED, Stage 3 NOT DONE = 0 — or this phase does not run at all** (you already stopped at the failing stage above; this section only applies once you actually reach it).
 
@@ -320,12 +320,13 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 
 The founder reads only the ending. Two outputs:
 
-1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to `.git/info/exclude` so it is never committed). Format below.
+1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
 2. **Chat → at most 8 lines**, nothing else:
    ```
    **Ship-check: <feature>** — SHIPPABLE / WITH CAVEATS / NOT SHIPPABLE
    **Done:** <what shipped> · merged <PR links + squash SHA> · live <yes/no + where>
    **Fixed during check:** <N findings fixed; fixes re-reviewed in 2.E: <rounds>, clean>
+   **Ship-checked:** yes — confidence <high/medium/low + one-line why>
    **Not done:** <each open item + why, or "none">
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
    **Needs you:** <only-you steps with deep links, or omit>

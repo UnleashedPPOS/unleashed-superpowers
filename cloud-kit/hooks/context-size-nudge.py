@@ -5,9 +5,9 @@ Auto-compact (200k) keeps each chat's context bounded, so a chat can and should 
 working through compactions until the job is done. This hook never asks a chat to stop.
 It counts compactions; after COMPACT_AT of them (and every STEP more) it reminds the chat
 that, once the current job is finished, the NEXT job should start in a fresh session.
-Reads the transcript incrementally (offset cached in /tmp). Silent on any error.
+Reads the transcript incrementally (offset cached in ~/.claude/state). Silent on any error.
 """
-import json, os, sys
+import json, os, sys, tempfile
 
 COMPACT_AT = 4
 STEP = 2
@@ -19,10 +19,14 @@ try:
     sid = payload.get("session_id") or "x"
     if not path or not os.path.exists(path):
         sys.exit(0)
-    state_path = f"/tmp/claude-compact-nudge-{sid}"
+    state_dir = os.path.expanduser("~/.claude/state")
+    os.makedirs(state_dir, exist_ok=True)
+    state_path = os.path.join(state_dir, f"compact-nudge-{os.path.basename(sid)}.json")
     st = {"off": 0, "n": 0, "warned": 0}
-    if os.path.exists(state_path):
+    try:
         st.update(json.load(open(state_path)))
+    except Exception:
+        pass  # missing or torn state file: recount from the start
     size = os.path.getsize(path)
     if size < st["off"]:
         st = {"off": 0, "n": 0, "warned": 0}
@@ -33,10 +37,13 @@ try:
     end = chunk.rfind(b"\n") + 1
     st["n"] += chunk[:end].count(MARK)
     st["off"] += end
-    fire = st["n"] >= COMPACT_AT and st["n"] >= st["warned"] + (STEP if st["warned"] else 0) and st["n"] != st["warned"]
+    fire = st["n"] >= (st["warned"] + STEP if st["warned"] else COMPACT_AT)
     if fire:
         st["warned"] = st["n"]
-    json.dump(st, open(state_path, "w"))
+    fd, tmp = tempfile.mkstemp(dir=state_dir)
+    with os.fdopen(fd, "w") as f:
+        json.dump(st, f)
+    os.replace(tmp, state_path)
     if not fire:
         sys.exit(0)
     msg = (f"[token] {st['n']} compactions. Keep working; when the whole job is done, "
