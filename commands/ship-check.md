@@ -323,12 +323,13 @@ The founder reads only the ending. Two outputs:
 1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
 2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
    ```
-   **Done:** <what shipped> · merged <PR link> · live <yes/no + where>
+   **Done:** <what shipped> · merged <PR link, or "not merged"> · live <yes/no + where>
    **Remaining:** No known bugs, nothing left — ONLY if the verdict is SHIPPABLE; otherwise start with NOT SHIPPABLE / WITH CAVEATS, then each open item + why
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
    The report file is not linked in chat; give its path only if the founder asks.
+   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** says what is NOT merged; **Remaining** starts NOT SHIPPABLE and names each blocker in one plain line.
 
 Full-report format (file only):
 
