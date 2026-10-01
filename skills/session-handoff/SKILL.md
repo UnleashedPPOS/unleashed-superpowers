@@ -25,7 +25,7 @@ User says: "session handoff", "wrap up session", "hand off", "handoff summary", 
    - Memory files written or updated (`~/.claude/projects/<project-slug>/memory/`).
    - Unresolved questions — things you asked the user that never got a clear answer, or things the user asked that got deflected.
    - **Every not-done item** — sweep ALL of these, not just the last task: anything the founder asked for that didn't happen; deferred or parked items (including founder-deferred); unfixed review / red-team findings; ship-check `Remaining` lines and DoD `NOT DONE` / `OWNER` rows; failing or pending CI; unmerged PRs; lanes not yet returned; `tasks/todo.md` unchecked boxes and TodoWrite pending items; and every not-done item in any earlier handoff this session continued from (carry it forward unless it's now done).
-3. **Do NOT audit the filesystem.** This is synthesis of what happened in THIS session. No `git log`, no broad `Glob` sweeps. If you didn't touch it this session, it doesn't belong here. Exceptions, always allowed: worktree state from your environment context; this session's ship-check reports (`<repo>/.claude/ship-check-reports/`), `tasks/todo.md`, and the earlier handoff file this session continued from — read them to build the Not done list.
+3. **Do NOT audit the filesystem.** This is synthesis of what happened in THIS session. No `git log`, no broad `Glob` sweeps. If you didn't touch it this session, it doesn't belong here. Exceptions, always allowed: worktree state from your environment context; this session's ship-check reports (`<repo>/.claude/ship-check-reports/`), `tasks/todo.md`, the earlier handoff file this session continued from, and one `gh pr list --author @me --state open` / `gh pr checks <N>` per repo touched — use them to build the Not done list.
 4. **Produce the output in chat AND save it** to `~/.claude/handoffs/<YYYY-MM-DD-HHMM>-<short-slug>.md` (Write tool) so the next chat can read it even if this one is gone. Do not update memory from this skill.
 5. **End with a ready-to-paste starter** for the new chat (see template).
 
@@ -70,7 +70,7 @@ User says: "session handoff", "wrap up session", "hand off", "handoff summary", 
 <1-2 sentences: the first action for a fresh agent — then work through every item in Not done>
 
 ## Paste into the new chat
-> Continue from the handoff at `~/.claude/handoffs/<file>.md` — read it first. Then: <pick-up action>, then finish every item in its "Not done" list (founder-deferred and OWNER items stay listed, untouched, until done).
+> Continue from the handoff at `<absolute path to the handoff file>` — read it first. Then: <pick-up action>, then finish every item in its "Not done" list (founder-deferred and OWNER items stay listed, untouched, until done).
 ```
 
 ## Hard rules
@@ -78,12 +78,12 @@ User says: "session handoff", "wrap up session", "hand off", "handoff summary", 
 0. **Your final reply MUST end with the paste-in starter in a fenced code block** — absolute path to the handoff file + the exact next action, so the new chat guesses nothing. Never end with just "I stopped because context is large". If state changes after you write the file (e.g. a reviewer returns), update the file before stopping — no stale lines; record results, don't say "see earlier chat".
 1. **Chat + one handoff file** in `~/.claude/handoffs/` only. Never update memory from this skill (lasting lessons → `/learnings`).
 2. **Never drop a not-done item.** Every unfinished, deferred, parked, blocked or OWNER item goes in "Not done", however small or old, including ones carried from an earlier handoff. A short handoff that loses an item is a failed handoff. Only remove an item when it is verifiably done (cite the PR/commit in "what shipped").
-2a. **Never invent state.** If a section has nothing to report, write "none" — do not omit the section. Structure stability is the whole point.
-3. **Absolute paths always.** The next agent may have a different working directory.
-4. **If a plan file drove the session, name it first** in "Key files" so the next agent reads it before anything else.
-5. **No emojis, no hype, no "great job" summaries.** Terse and concrete — paths, commands, shell IDs, decisions. Match the tone of a seasoned engineer handing off at end-of-shift.
-6. **Background process IDs are critical.** If you started any `run_in_background` shells, their IDs must appear in "Running state" with the kill command — the next agent cannot find them otherwise.
-7. **Worktree path is critical.** Check your environment context (system prompt) for "Primary working directory" and "Current branch" before writing "none" for worktrees. If the path contains `.claude/worktrees/` or the branch starts with `claude/`, you are in a worktree — record the absolute path and branch name. A worktree not named in the handoff will be auto-deleted by the runtime if no files were written.
+3. **Never invent state.** If a section has nothing to report, write "none" — do not omit the section. Structure stability is the whole point.
+4. **Absolute paths always.** The next agent may have a different working directory.
+5. **If a plan file drove the session, name it first** in "Key files" so the next agent reads it before anything else.
+6. **No emojis, no hype, no "great job" summaries.** Terse and concrete — paths, commands, shell IDs, decisions. Match the tone of a seasoned engineer handing off at end-of-shift.
+7. **Background process IDs are critical.** If you started any `run_in_background` shells, their IDs must appear in "Running state" with the kill command — the next agent cannot find them otherwise.
+8. **Worktree path is critical.** Check your environment context (system prompt) for "Primary working directory" and "Current branch" before writing "none" for worktrees. If the path contains `.claude/worktrees/` or the branch starts with `claude/`, you are in a worktree — record the absolute path and branch name. A worktree not named in the handoff will be auto-deleted by the runtime if no files were written.
 
 ## Anti-patterns — do not do these
 
