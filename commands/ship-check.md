@@ -275,7 +275,7 @@ Compute the verdict from Stages 1–3. **All three must be CLEAN — Stage 1 CLE
 You merge the open PRs from this session yourself. The user does not click anything.
 
 ### 6.0 Hard precondition — the Phase 1.11 isolation verdict MUST be ISOLATED
-Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes). Merging an integration/shared branch to main as a side effect of landing your fix ships other people's unreviewed work to production and may race active commits. ENTANGLED → you already escalated the scope decision in 1.11; obey the user's choice (open-PR-and-hold / track-owner-merges / explicit merge-the-whole-track). Auto-merge only proceeds for genuinely isolated work.
+Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes). Merging an integration/shared branch to main as a side effect of landing your fix ships other people's unreviewed work to production and may race active commits. ENTANGLED → you already escalated the scope decision in 1.11; obey the user's choice (open-PR-and-hold / track-owner-merges / explicit merge-the-whole-track). Auto-merge only proceeds for genuinely isolated work. (Chat output: the Phase 7 4-line status.)
 
 ### 6.1 Identify in-scope PRs
 - `gh pr list --state open --search "author:@me head:<this-session's-branch>"` OR (when working without a head filter) cross-reference `git log <session-start-sha>..HEAD` with `gh pr list --state open --json number,headRefName`. Only merge PRs **whose branch matches a commit you authored in this session** AND whose commit set is yours alone (re-check authorship per 1.11). Never merge unrelated open PRs, and never merge a PR that also carries other authors' commits without explicit user go-ahead.
@@ -286,7 +286,7 @@ Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicat
    ```bash
    git merge-tree $(git merge-base origin/main origin/<branch>) origin/main origin/<branch> | grep -E 'CONFLICT|<<<<<<<' | head -3
    ```
-   Empty output = clean. Hits = STOP, escalate to the user; do not force-resolve.
+   Empty output = clean. Hits = STOP, escalate to the user; do not force-resolve. (Chat output: the Phase 7 4-line status.)
 3. **Squash merge:**
    ```bash
    gh pr merge <N> --squash --repo <owner>/<repo>
@@ -296,7 +296,7 @@ Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicat
    git fetch && git merge-base --is-ancestor <squash-sha> origin/main && echo IN_MAIN || echo MISSING
    git grep <key-symbol-from-PR-diff> origin/main -- <relevant-file>
    ```
-   Both must succeed. If either fails → escalate immediately.
+   Both must succeed. If either fails → escalate immediately. (Chat output: the Phase 7 4-line status.)
 
 ### 6.3 When CI is still pending at audit time
 Do not merge with pending checks. Two paths:
@@ -324,7 +324,7 @@ The founder reads only the ending. Two outputs:
 2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
    ```
    **Done:** <what shipped> · merged <PR link, or "not merged"> · live <yes/no + where>
-   **Remaining:** No known bugs, nothing left — ONLY if the verdict is SHIPPABLE; otherwise start with NOT SHIPPABLE / WITH CAVEATS, then each open item + why
+   **Remaining:** No known bugs, nothing left — ONLY if SHIPPABLE and merged; otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED, then each open item + why
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
