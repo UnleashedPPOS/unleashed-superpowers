@@ -9,6 +9,10 @@ to run /ship-check. Allows the stop when the hook already fired this cycle (stop
 or when the prompt itself was /ship-check. Founder 2026-10-01: "every single time you do some
 sort of work I want you to ship check it". Silent on any error.
 
+Docs-only work never triggers it: edits to .md/.mdx/.txt/.rst files (handoffs, notes,
+progress files) and commits whose files are all docs are ignored. Founder 2026-10-01: the
+hook re-prompted after a turn that only saved keys and updated a handoff file.
+
 Known gap: sub-agent edits that are neither committed in the session cwd's repo nor made by
 this transcript (e.g. uncommitted work in another worktree) are not seen.
 """
@@ -17,9 +21,17 @@ from datetime import datetime
 
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
+# Allowlist: only plain notes/handoffs/docs count as docs. Anything else (prompts, rules,
+# skills, deployed content, dependency lists) is treated as code.
+DOC_FILE = re.compile(r"(^|/)(README|CHANGELOG|HANDOFF|NOTES|TODO|PROGRESS|LESSONS)[^/]*\.(md|txt)$"
+                      r"|(^|/)(docs|tasks|handoffs)/[^\0]*\.md$", re.I)
+NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks|\.claude)/|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$", re.I)
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+# Commands that run a quoted string as shell code: bash -c "...", ssh host "...", eval "...", docker exec.
+SHELL_WRAP = re.compile(r"\b(?:ba|z|da|k)?sh\s+(?:-\S+\s+)*-\w*c\b|\bssh\b|\beval\b|\bsu\b.*\s-c\b|\bdocker\s+exec\b")
+SUBST = re.compile(r"\$\(|`")
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*\\?(['\"]?)([A-Za-z_]\w*)\1")
 NOT_A_PROMPT = ("<task-notification", "<local-command", "[Request interrupted", "<system-reminder")
 SHIP_CHECK_PROMPT = re.compile(r"^\s*/ship-check\b|<command-name>/?ship-check</command-name>")
@@ -45,6 +57,17 @@ def runs_git_change(cmd):
     return bool(GIT_CHANGE.search(QUOTED.sub("''", strip_heredocs(cmd))))
 
 
+def wrapped_git_change(cmd):
+    """True if git commit / gh pr create runs inside a quoted string the shell executes
+    (bash -c, ssh, eval, "$(...)"). Its repo can't be resolved, so it always counts as code."""
+    cmd = strip_heredocs(cmd)
+    wrapped = bool(SHELL_WRAP.search(QUOTED.sub("''", cmd)))
+    for q in QUOTED.findall(cmd):
+        if GIT_CHANGE.search(q[1:-1]) and (wrapped or (q[0] == '"' and SUBST.search(q))):
+            return True
+    return False
+
+
 def is_real_prompt(entry):
     if entry.get("type") != "user" or entry.get("isMeta") or entry.get("isCompactSummary"):
         return False
@@ -68,6 +91,62 @@ def prompt_text(entry):
     if isinstance(content, str):
         return content
     return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+
+
+def is_doc(path):
+    return bool(DOC_FILE.search(path)) and not NOT_DOCS.search(path)
+
+
+REPO_ARG = re.compile(r"(?:\b(?:cd|pushd)|\s-C|--git-dir=?|--work-tree=?|\bGIT_(?:DIR|WORK_TREE)=)\s*(\S+)")
+
+
+def repos_touched(cwd, cmds):
+    """Directories the turn's commands moved into (cd / git -C / --git-dir / --work-tree), plus cwd.
+    Returns None if one can't be resolved (variables, subshell tricks), meaning: assume code."""
+    dirs = {cwd} if cwd else set()
+    for cmd in cmds:
+        for raw in REPO_ARG.findall(cmd):
+            raw = raw.rstrip(";&|)")
+            if "$" in raw or "`" in raw or not raw or raw == "''":
+                return None
+            d = os.path.expanduser(raw)
+            d = d if os.path.isabs(d) else os.path.join(cwd or "", d)
+            d = os.path.normpath(d[:-5] if d.endswith("/.git") else d)
+            if not os.path.isdir(d):
+                return None
+            dirs.add(d)
+    return dirs
+
+
+def all_commits_docs_only(dirs, ts):
+    """True if every touched repo's commits since the prompt are docs-only and at least one exists."""
+    seen = False
+    for d in dirs:
+        r = commits_docs_only(d, ts)
+        if r is False:
+            return False
+        seen = seen or r is True
+    return seen
+
+
+def commits_docs_only(cwd, ts):
+    """True if every commit in cwd's repo since the prompt touches only doc files; None if that repo
+    has no commits since the prompt; False otherwise (or on any doubt)."""
+    if not cwd or not ts:
+        return False
+    try:
+        since = int(datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
+        out = subprocess.run(["git", "-C", cwd, "log", "--date-order", f"--since={since}", "-m", "--no-renames",
+                              "--name-only", "-z", "--format=", "HEAD"],
+                             capture_output=True, text=True, timeout=3)
+        if out.returncode != 0:
+            return False
+        files = [f.strip() for f in out.stdout.split("\0") if f.strip()]
+        if not files:
+            return None
+        return all(is_doc(f) for f in files)
+    except Exception:
+        return False
 
 
 def committed_since(cwd, ts):
@@ -112,6 +191,12 @@ def main():
               for b in ((e.get("message") or {}).get("content") or [])
               if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error")}
     changed = shipped = delegated = False
+    cwd = payload.get("cwd")
+    docs_only = None  # computed once, on the first commit seen
+    bash_cmds = [QUOTED.sub("''", strip_heredocs(str((b.get("input") or {}).get("command", ""))))
+                 for e in tail if e.get("type") == "assistant"
+                 for b in (e.get("message") or {}).get("content") or []
+                 if isinstance(b, dict) and b.get("name") == "Bash"]
     for e in tail:
         if e.get("type") != "assistant":
             continue
@@ -129,12 +214,17 @@ def main():
                 continue
             elif name in EDIT_TOOLS:
                 fp = str(inp.get("file_path") or inp.get("notebook_path") or "")
-                if fp and not fp.startswith(SKIP_PREFIXES):
+                if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
-            elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
+            elif name == "Bash" and wrapped_git_change(str(inp.get("command", ""))):
                 changed = True
-    if not changed and not shipped and delegated:
-        changed = committed_since(payload.get("cwd"), start.get("timestamp"))
+            elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
+                if docs_only is None:
+                    dirs = repos_touched(cwd, bash_cmds)
+                    docs_only = dirs is not None and all_commits_docs_only(dirs, start.get("timestamp"))
+                changed = changed or not docs_only
+    if not changed and not shipped and delegated and docs_only is None:
+        changed = committed_since(cwd, start.get("timestamp")) and commits_docs_only(cwd, start.get("timestamp")) is not True
     if changed:
         print(json.dumps({
             "decision": "block",

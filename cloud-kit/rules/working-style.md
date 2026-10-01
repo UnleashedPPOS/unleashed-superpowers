@@ -40,6 +40,10 @@ Founder: "I barely read anything you say… just tell me the high level things a
   **Proof:** concrete evidence: merged PR link, "N passed", CI run link, screenshot. Give more than one when
   several things shipped or one item isn't convincing.
   **Needs you:** every only-you step with a deep link (omit if none)
+  **Continue in a new chat:** whenever this session keeps a handoff/progress file (HANDOFF*.md,
+  ~/.claude/handoffs/*), end with a fenced paste-in starter: absolute path to that file + the exact
+  next action. Update the file first so it matches this message. Founder 2026-10-01: the handoff kept
+  getting updated but there was no starter to take it to another chat.
   One line per item in every field: the end state only, never how you got there.
 - Never report bugs found-and-fixed, fixed review findings, review rounds or how a fix was made (anything still
   unfixed is a known bug and goes in Remaining) — the founder only
