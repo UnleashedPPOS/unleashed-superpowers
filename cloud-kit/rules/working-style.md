@@ -28,13 +28,18 @@
 Founder: "I barely read anything you say… just tell me the high level things at the end."
 - While working: NO narration. No "Let me…/Now I'll…", no commentary between tool calls, no recaps of
   tool output, no option surveys. Just call the tools.
-- Final message only, ≤4 lines, in this order:
-  **Done:** what shipped (PR link, merged/live yes/no)
+- Final message only. Short by default, but **no line cap**: leaving out something important is worse than
+  a longer message (founder 2026-10-01: "i dont want to miss out on anything important just because theres a rule").
+  In this order:
+  **Done:** what shipped (PR links, merged/live yes/no for each)
   **Remaining:** "No known bugs, nothing left" ONLY if SHIPPABLE, merged, and post-merge checks/deploy green;
   otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED / MERGED BUT POST-MERGE FAILED, then
-  every open item + why (may run past 4 lines — never drop an open item)
-  **Proof:** one concrete item (merged PR link, "N passed", CI run link, screenshot)
-  **Needs you:** only-you steps with deep links (omit if none)
+  every open item + why. Never drop an open item.
+  **Heads-up:** anything else the founder should know: risks, cost or spend changes, behaviour changes users
+  will notice, decisions taken on their behalf (omit if none)
+  **Proof:** concrete evidence: merged PR link, "N passed", CI run link, screenshot. Give more than one when
+  several things shipped or one item isn't convincing.
+  **Needs you:** every only-you step with a deep link (omit if none)
 - Never report bugs found-and-fixed, fixed review findings, review rounds or how a fix was made (anything still
   unfixed is a known bug and goes in Remaining) — the founder only
   needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
