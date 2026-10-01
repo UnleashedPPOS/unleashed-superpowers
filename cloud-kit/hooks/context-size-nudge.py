@@ -41,9 +41,13 @@ try:
     if fire:
         st["warned"] = st["n"]
     fd, tmp = tempfile.mkstemp(dir=state_dir)
-    with os.fdopen(fd, "w") as f:
-        json.dump(st, f)
-    os.replace(tmp, state_path)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(st, f)
+        os.replace(tmp, state_path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
     if not fire:
         sys.exit(0)
     msg = (f"[token] {st['n']} compactions. Keep working; when the whole job is done, "

@@ -3,7 +3,7 @@
 
 Since the last real (human) user prompt, if the assistant edited code (Edit/Write/NotebookEdit
 outside ~/.claude, /tmp and the scratchpad), ran `git commit` / `gh pr create`, or a commit
-landed in the session's repo (covers sub-agents, whose edits live in their own transcripts),
+landed in the session's repo during a turn that ran sub-agents (their edits live in their own transcripts),
 and has not invoked ship-check AFTER the first such change, block the stop once and tell it
 to run /ship-check. Allows the stop when the hook already fired this cycle (stop_hook_active)
 or when the prompt itself was /ship-check. Founder 2026-10-01: "every single time you do some
@@ -18,9 +18,9 @@ from datetime import datetime
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
-GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+)*commit\b|\bgh\s+pr\s+create\b")
+GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
-HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1")
+HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_]\w*)\1")
 NOT_A_PROMPT = ("<task-notification", "<local-command", "[Request interrupted", "<system-reminder")
 SHIP_CHECK_PROMPT = re.compile(r"^\s*/ship-check\b|<command-name>/?ship-check</command-name>")
 
@@ -111,7 +111,7 @@ def main():
     failed = {b.get("tool_use_id") for e in tail if e.get("type") == "user"
               for b in ((e.get("message") or {}).get("content") or [])
               if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error")}
-    changed = shipped = False
+    changed = shipped = delegated = False
     for e in tail:
         if e.get("type") != "assistant":
             continue
@@ -119,7 +119,9 @@ def main():
             if not isinstance(b, dict) or b.get("type") != "tool_use":
                 continue
             name, inp = b.get("name", ""), b.get("input") or {}
-            if name in ("Skill", "SlashCommand") and "ship-check" in json.dumps(inp):
+            if name in ("Agent", "Task"):
+                delegated = True
+            if name in ("Skill", "SlashCommand") and "ship-check" in str(inp.get("skill") or inp.get("command") or ""):
                 if changed:
                     return
                 shipped = True
@@ -131,7 +133,7 @@ def main():
                     changed = True
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
                 changed = True
-    if not changed and not shipped:
+    if not changed and not shipped and delegated:
         changed = committed_since(payload.get("cwd"), start.get("timestamp"))
     if changed:
         print(json.dumps({

@@ -32,7 +32,7 @@ manifest=$(fetch cloud-kit/MANIFEST) || { echo "cloud-kit: manifest fetch failed
 
 ok=0; bad=0; installed=""
 while IFS= read -r path; do
-  case "$path" in ''|'#'*|*..*|/*) continue ;; esac
+  case "$path" in ''|'#'*|/*|../*|*/../*|*/..) continue ;; esac
   case "$path" in
     cloud-kit/rules/*) dest="$CL/rules/${path#cloud-kit/rules/}" ;;
     cloud-kit/hooks/*) dest="$CL/hooks/${path#cloud-kit/hooks/}" ;;
@@ -82,9 +82,9 @@ def ensure(event, key, command, **extra):
                 return
     arr.append({"hooks": [hook]})
 
-ensure("Stop", "hooks/auto-ship-check.py", f'"{cl}/hooks/auto-ship-check.py"', timeout=10)
-ensure("PostToolUse", "hooks/context-size-nudge.py", f'"{cl}/hooks/context-size-nudge.py"', timeout=10)
-ensure("SessionStart", "cloud-kit/install.sh", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
+ensure("Stop", "/.claude/hooks/auto-ship-check.py", f'"{cl}/hooks/auto-ship-check.py"', timeout=10)
+ensure("PostToolUse", "/.claude/hooks/context-size-nudge.py", f'"{cl}/hooks/context-size-nudge.py"', timeout=10)
+ensure("SessionStart", "/cloud-kit/install.sh | bash", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
        timeout=600, **{"async": True})
 fd, tmp = tempfile.mkstemp(dir=cl, prefix=".settings.")
 with os.fdopen(fd, "w") as f:
@@ -92,12 +92,14 @@ with os.fdopen(fd, "w") as f:
 os.replace(tmp, p)
 PY
 
-# Plugins ship-check leans on (reviewer agents). Third-party marketplace pinned to a release tag.
+# Plugins ship-check leans on (reviewer agents). Third-party marketplace pinned to a release tag:
+# v1.10.0 is the last tag that still names the plugin everything-claude-code (v2 renamed it ecc,
+# which would break the everything-claude-code:* agent names ship-check calls).
 # Best-effort: skipped if the CLI or network refuses; retried next session until all succeed.
 if command -v claude >/dev/null 2>&1 && [ ! -f "$CL/.cloud-kit-plugins" ]; then
   timeout 120 claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1
   timeout 120 claude plugin install superpowers@claude-plugins-official >/dev/null 2>&1 && p1=1
-  timeout 120 claude plugin marketplace add "affaan-m/everything-claude-code#v2.2.2" >/dev/null 2>&1
+  timeout 120 claude plugin marketplace add "affaan-m/everything-claude-code#v1.10.0" >/dev/null 2>&1
   timeout 120 claude plugin install everything-claude-code@everything-claude-code >/dev/null 2>&1 && p2=1
   [ -n "${p1:-}" ] && [ -n "${p2:-}" ] && touch "$CL/.cloud-kit-plugins"
 fi
