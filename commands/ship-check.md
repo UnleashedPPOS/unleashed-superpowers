@@ -321,17 +321,14 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 The founder reads only the ending. Two outputs:
 
 1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
-2. **Chat → at most 8 lines**, nothing else:
+2. **Chat → at most 4 lines**, nothing else. Never list findings, fixes or review rounds in chat — the founder only wants the end state:
    ```
-   **Ship-check: <feature>** — SHIPPABLE / WITH CAVEATS / NOT SHIPPABLE
-   **Done:** <what shipped> · merged <PR links + squash SHA> · live <yes/no + where>
-   **Fixed during check:** <N findings fixed; fixes re-reviewed in 2.E: <rounds>, clean>
-   **Ship-checked:** yes — confidence <high/medium/low + one-line why>
-   **Not done:** <each open item + why, or "none">
+   **Done:** <what shipped> · merged <PR link> · live <yes/no + where>
+   **Remaining:** No known bugs, nothing left — or each open item + why (NOT SHIPPABLE / WITH CAVEATS say so here)
    **Proof:** <one concrete artefact — test line, CI run link, content-proof, screenshot>
-   **Needs you:** <only-you steps with deep links, or omit>
-   Full report: <link to the file>
+   **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
+   Don't link the report file unless the verdict isn't SHIPPABLE.
 
 Full-report format (file only):
 

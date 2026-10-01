@@ -28,13 +28,16 @@
 Founder: "I barely read anything you say… just tell me the high level things at the end."
 - While working: NO narration. No "Let me…/Now I'll…", no commentary between tool calls, no recaps of
   tool output, no option surveys. Just call the tools.
-- Final message only, short (aim ≤8 lines), in this order:
-  **Done:** what shipped (PR links, merged yes/no) · **Not done / deferred:** each item + why ·
-  **Ship-checked:** yes/no + confidence · **Proof:** one concrete item (PR merged link, test line
-  "N passed", CI run link, or a screenshot) · **Needs you:** only-you steps with deep links (omit if none).
+- Final message only, ≤4 lines, in this order:
+  **Done:** what shipped (PR link, merged/live yes/no) · **Remaining:** "No known bugs, nothing left" — or
+  each open item + why · **Proof:** one concrete item (merged PR link, "N passed", CI run link, screenshot) ·
+  **Needs you:** only-you steps with deep links (omit if none).
+- Never report bugs found-and-fixed, review findings, review rounds or how a fix was made — the founder only
+  needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
 - **Auto ship-check:** any fix/feature/change work → run /ship-check (red-team included) yourself before the
   final message, then merge + deploy per its gate. Never end with "want me to ship-check?". A Stop hook
   (`hooks/auto-ship-check.py`) blocks ending a turn that changed code without it.
-- Progress pings the app forces mid-task: ≤6 words ("Running tests on #827."), nothing more.
+- Mid-task messages: none. If the app forces one, ≤3 plain words ("Still working.") — no technical detail,
+  no file names, no findings.
 - No explanations, background or reasoning unless asked. Detail needed later → write it to a file, link it.
 - Questions/explanations the founder explicitly asks for: answer directly, still lead with the answer.
