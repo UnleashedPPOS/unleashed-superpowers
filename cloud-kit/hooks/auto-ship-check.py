@@ -9,6 +9,10 @@ to run /ship-check. Allows the stop when the hook already fired this cycle (stop
 or when the prompt itself was /ship-check. Founder 2026-10-01: "every single time you do some
 sort of work I want you to ship check it". Silent on any error.
 
+Docs-only work never triggers it: edits to .md/.mdx/.txt/.rst files (handoffs, notes,
+progress files) and commits whose files are all docs are ignored. Founder 2026-10-01: the
+hook re-prompted after a turn that only saved keys and updated a handoff file.
+
 Known gap: sub-agent edits that are neither committed in the session cwd's repo nor made by
 this transcript (e.g. uncommitted work in another worktree) are not seen.
 """
@@ -17,6 +21,7 @@ from datetime import datetime
 
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
+DOC_EXT = (".md", ".mdx", ".txt", ".rst")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
@@ -70,6 +75,25 @@ def prompt_text(entry):
     return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
 
 
+def is_doc(path):
+    return path.lower().endswith(DOC_EXT)
+
+
+def commits_docs_only(cwd, ts):
+    """True if every commit in cwd's repo since the prompt touches only doc files.
+    No commits found there (e.g. the commit was in another repo) counts as code."""
+    if not cwd or not ts:
+        return False
+    try:
+        since = int(datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
+        out = subprocess.run(["git", "-C", cwd, "log", f"--since={since}", "--name-only", "--format=", "HEAD"],
+                             capture_output=True, text=True, timeout=3)
+        files = [f for f in out.stdout.splitlines() if f.strip()]
+        return out.returncode == 0 and bool(files) and all(is_doc(f) for f in files)
+    except Exception:
+        return False
+
+
 def committed_since(cwd, ts):
     """True if the repo at cwd has a commit newer than the prompt timestamp (ISO 8601)."""
     if not cwd or not ts:
@@ -112,6 +136,8 @@ def main():
               for b in ((e.get("message") or {}).get("content") or [])
               if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error")}
     changed = shipped = delegated = False
+    cwd = payload.get("cwd")
+    docs_only = None  # computed once, on the first commit seen
     for e in tail:
         if e.get("type") != "assistant":
             continue
@@ -129,12 +155,14 @@ def main():
                 continue
             elif name in EDIT_TOOLS:
                 fp = str(inp.get("file_path") or inp.get("notebook_path") or "")
-                if fp and not fp.startswith(SKIP_PREFIXES):
+                if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
-                changed = True
-    if not changed and not shipped and delegated:
-        changed = committed_since(payload.get("cwd"), start.get("timestamp"))
+                if docs_only is None:
+                    docs_only = commits_docs_only(cwd, start.get("timestamp"))
+                changed = changed or not docs_only
+    if not changed and not shipped and delegated and docs_only is None:
+        changed = committed_since(cwd, start.get("timestamp")) and not commits_docs_only(cwd, start.get("timestamp"))
     if changed:
         print(json.dumps({
             "decision": "block",
