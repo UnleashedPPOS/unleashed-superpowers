@@ -1,15 +1,17 @@
 {
   "name": "unleashed-superpowers",
-  "description": "Public marketplace for Unleashed Superpowers — AI-native design skills and feature-documentation tooling",
   "owner": {
     "name": "Elliot Kelly",
     "email": "elliotkelly@unleashed.vision"
   },
+  "metadata": {
+    "description": "Public marketplace for Unleashed Superpowers: AI-native design skills, feature docs, /ship-check and High-Level mode"
+  },
   "plugins": [
     {
       "name": "unleashed-superpowers",
-      "description": "AI-native design skills — anthropomorphic surface, AI-native engine, event-log bridge. Plus reference-quality feature documentation.",
-      "version": "0.1.0",
+      "description": "AI-native design skills, reference-quality feature docs, the /ship-check gate, and High-Level mode (end-state-only reporting).",
+      "version": "0.3.0",
       "source": "./",
       "author": {
         "name": "Elliot Kelly",

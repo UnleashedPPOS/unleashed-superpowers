@@ -67,6 +67,15 @@ The `description` field is the most important line in a skill. It's what Claude 
 3. Bump version (patch is fine for commands).
 4. Commit with message `feat(cmd): add /<name>`.
 
+## Adding an output style
+
+1. Create `output-styles/<name>.md` with frontmatter `name`, `description` and `keep-coding-instructions: true`.
+2. Pair it with a skill if users should be able to toggle it by phrase (see `skills/high-level/`).
+3. Run `bash scripts/build-cloud-manifest.sh` so cloud sessions get it too.
+4. Bump the minor version. Commit with message `feat(style): add <name>`.
+
+Quote any frontmatter value that contains `: ` (`description: "…"`). Otherwise the YAML fails to parse and the skill loads with empty metadata. Check with `claude plugin validate .`.
+
 ## Attribution policy
 
 This plugin currently contains only originally-authored content. If a skill is borrowed or forked from elsewhere:
