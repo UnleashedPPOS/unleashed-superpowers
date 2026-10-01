@@ -18,9 +18,9 @@ from datetime import datetime
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
-GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
+GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--[\w-]+(?:[= ]\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
-HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*\\?(['\"]?)([A-Za-z_]\w*)\1")
 NOT_A_PROMPT = ("<task-notification", "<local-command", "[Request interrupted", "<system-reminder")
 SHIP_CHECK_PROMPT = re.compile(r"^\s*/ship-check\b|<command-name>/?ship-check</command-name>")
 
