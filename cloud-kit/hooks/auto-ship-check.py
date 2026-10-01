@@ -26,10 +26,12 @@ SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
 DOC_FILE = re.compile(r"(^|/)(README|CHANGELOG|HANDOFF|NOTES|TODO|PROGRESS|LESSONS)[^/]*\.(md|txt)$"
                       r"|(^|/)(docs|tasks|handoffs)/[^\0]*\.md$", re.I)
 NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks|\.claude)/|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$", re.I)
-OTHER_REPO = re.compile(r"\bgit\s+(?:\S+\s+)*?-C\s|\bcd\s|--git-dir|--work-tree")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+# Commands that run a quoted string as shell code: bash -c "...", ssh host "...", eval "...", docker exec.
+SHELL_WRAP = re.compile(r"\b(?:ba|z|da|k)?sh\s+(?:-\S+\s+)*-\w*c\b|\bssh\b|\beval\b|\bsu\b.*\s-c\b|\bdocker\s+exec\b")
+SUBST = re.compile(r"\$\(|`")
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*\\?(['\"]?)([A-Za-z_]\w*)\1")
 NOT_A_PROMPT = ("<task-notification", "<local-command", "[Request interrupted", "<system-reminder")
 SHIP_CHECK_PROMPT = re.compile(r"^\s*/ship-check\b|<command-name>/?ship-check</command-name>")
@@ -53,6 +55,17 @@ def strip_heredocs(cmd):
 def runs_git_change(cmd):
     """True only if the shell itself runs git commit / gh pr create (not text in a heredoc or string)."""
     return bool(GIT_CHANGE.search(QUOTED.sub("''", strip_heredocs(cmd))))
+
+
+def wrapped_git_change(cmd):
+    """True if git commit / gh pr create runs inside a quoted string the shell executes
+    (bash -c, ssh, eval, "$(...)"). Its repo can't be resolved, so it always counts as code."""
+    cmd = strip_heredocs(cmd)
+    wrapped = bool(SHELL_WRAP.search(QUOTED.sub("''", cmd)))
+    for q in QUOTED.findall(cmd):
+        if GIT_CHANGE.search(q[1:-1]) and (wrapped or (q[0] == '"' and SUBST.search(q))):
+            return True
+    return False
 
 
 def is_real_prompt(entry):
@@ -84,7 +97,7 @@ def is_doc(path):
     return bool(DOC_FILE.search(path)) and not NOT_DOCS.search(path)
 
 
-REPO_ARG = re.compile(r"(?:\bcd|\s-C|--git-dir=?|--work-tree=?)\s*(\S+)")
+REPO_ARG = re.compile(r"(?:\b(?:cd|pushd)|\s-C|--git-dir=?|--work-tree=?|\bGIT_(?:DIR|WORK_TREE)=)\s*(\S+)")
 
 
 def repos_touched(cwd, cmds):
@@ -203,6 +216,8 @@ def main():
                 fp = str(inp.get("file_path") or inp.get("notebook_path") or "")
                 if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
+            elif name == "Bash" and wrapped_git_change(str(inp.get("command", ""))):
+                changed = True
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
                 if docs_only is None:
                     dirs = repos_touched(cwd, bash_cmds)
