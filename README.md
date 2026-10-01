@@ -74,6 +74,10 @@ Like caveman mode, but you keep normal sentences and drop everything the reader 
 
 To make it permanent, pick the **High-Level** output style that ships with this plugin (`"outputStyle": "High-Level"` in `~/.claude/settings.json`). Without the plugin, copy [`output-styles/high-level.md`](output-styles/high-level.md) into `~/.claude/output-styles/`.
 
+### Output styles
+
+**`High-Level`** ([`output-styles/high-level.md`](output-styles/high-level.md)) — the always-on version of the `high-level` skill. Cloud sessions set up with `cloud-kit/install.sh` use it by default.
+
 ### Commands
 
 | Command | What it does |

@@ -25,6 +25,8 @@
 - When branches conflict on a count/number, recount the real thing; never just pick a side.
 
 ## Output — founder reads only the ending (HARD RULE, 2026-10-01)
+Public, shareable copy: `output-styles/high-level.md` + `skills/high-level/` (High-Level mode). Change the format
+there and here in the same PR so they never drift.
 Founder: "I barely read anything you say… just tell me the high level things at the end."
 - While working: NO narration. No "Let me…/Now I'll…", no commentary between tool calls, no recaps of
   tool output, no option surveys. Just call the tools.
