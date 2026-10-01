@@ -29,9 +29,11 @@ Founder: "I barely read anything you say… just tell me the high level things a
 - While working: NO narration. No "Let me…/Now I'll…", no commentary between tool calls, no recaps of
   tool output, no option surveys. Just call the tools.
 - Final message only, ≤4 lines, in this order:
-  **Done:** what shipped (PR link, merged/live yes/no) · **Remaining:** "No known bugs, nothing left" (only when
-  ship-checked SHIPPABLE and merged) — otherwise the state (NOT SHIPPABLE / NOT MERGED) + each open item + why · **Proof:** one concrete item (merged PR link, "N passed", CI run link, screenshot) ·
-  **Needs you:** only-you steps with deep links (omit if none).
+  **Done:** what shipped (PR link, merged/live yes/no)
+  **Remaining:** "No known bugs, nothing left" ONLY if SHIPPABLE and merged; otherwise start with NOT SHIPPABLE /
+  WITH CAVEATS / SHIPPABLE BUT NOT MERGED, then each open item + why
+  **Proof:** one concrete item (merged PR link, "N passed", CI run link, screenshot)
+  **Needs you:** only-you steps with deep links (omit if none)
 - Never report bugs found-and-fixed, review findings, review rounds or how a fix was made — the founder only
   needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
 - **Auto ship-check:** any fix/feature/change work → run /ship-check (red-team included) yourself before the
