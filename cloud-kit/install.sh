@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cloud-kit/install.sh — give a Claude Code CLOUD session the same rules, hooks,
-# commands, skills and output style as Elliot's Mac.
+# commands, skills and output style (High-Level) as Elliot's Mac.
 #
 # Cloud sessions never see ~/.claude from the Mac and don't install repo-declared
 # plugins, so the cloud environment's setup script runs this once per VM image:
@@ -38,7 +38,7 @@ while IFS= read -r path; do
   case "$path" in
     cloud-kit/rules/*) dest="$CL/rules/${path#cloud-kit/rules/}" ;;
     cloud-kit/hooks/*) dest="$CL/hooks/${path#cloud-kit/hooks/}" ;;
-    commands/*|skills/*) dest="$CL/$path" ;;
+    commands/*|skills/*|output-styles/*) dest="$CL/$path" ;;
     *) continue ;;
   esac
   mkdir -p "$(dirname "$dest")"
@@ -68,7 +68,7 @@ if os.path.exists(p):
         sys.exit("cloud-kit: settings.json does not parse; not overwriting it")
 else:
     s = {}
-s["outputStyle"] = "Concise"
+s["outputStyle"] = "High-Level"
 s.setdefault("autoCompactWindow", 200000)
 s.setdefault("env", {}).setdefault("CLAUDE_CODE_SUBAGENT_MODEL", "sonnet")
 hooks = s.setdefault("hooks", {})

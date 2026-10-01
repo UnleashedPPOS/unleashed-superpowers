@@ -3,6 +3,7 @@ cloud-kit/hooks/auto-ship-check.py
 cloud-kit/hooks/context-size-nudge.py
 cloud-kit/rules/credential-handoffs.md
 cloud-kit/rules/git-workflow.md
+cloud-kit/rules/share-setup.md
 cloud-kit/rules/token-discipline.md
 cloud-kit/rules/user-handoffs.md
 cloud-kit/rules/working-style.md
@@ -11,9 +12,11 @@ commands/document-feature-module.md
 commands/dod.md
 commands/red-team.md
 commands/ship-check.md
+output-styles/high-level.md
 skills/authoring-ios-shortcuts/SKILL.md
 skills/definition-of-done/SKILL.md
 skills/designing-ai-systems/SKILL.md
 skills/document-feature-module/SKILL.md
+skills/high-level/SKILL.md
 skills/red-team/SKILL.md
 skills/session-handoff/SKILL.md

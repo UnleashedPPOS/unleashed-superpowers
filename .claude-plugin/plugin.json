@@ -1,7 +1,7 @@
 {
   "name": "unleashed-superpowers",
-  "description": "AI-native design skills — anthropomorphic surface, AI-native engine, event-log bridge. Plus reference-quality feature documentation.",
-  "version": "0.2.0",
+  "description": "AI-native design skills, reference-quality feature docs, the /ship-check gate, and High-Level mode (end-state-only reporting).",
+  "version": "0.3.0",
   "author": {
     "name": "Elliot Kelly",
     "email": "elliotkelly@unleashed.vision"
@@ -15,6 +15,8 @@
     "claude-code",
     "multi-agent",
     "documentation",
-    "two-layer-design"
-  ]
+    "two-layer-design",
+    "output-style"
+  ],
+  "outputStyles": "./output-styles/"
 }

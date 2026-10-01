@@ -68,6 +68,12 @@ Produces docs a new contributor (or AI agent) can trust without cross-checking t
 
 Golden rule: **every factual claim resolves to a grepable symbol.** If you can't grep it, don't write it.
 
+**`high-level`** — High-Level mode: end-state-only reporting.
+
+Like caveman mode, but you keep normal sentences and drop everything the reader doesn't need. No narration while the agent works, then one final message: **Done / Remaining / Heads-up / Proof / Needs you**, one line per item, each fact said once, with no line cap so open items are never dropped. Say "high-level mode" (or `/high-level`) to turn it on and "normal mode" to turn it off.
+
+To make it permanent, pick the **High-Level** output style that ships with this plugin (`"outputStyle": "High-Level"` in `~/.claude/settings.json`). Without the plugin, copy [`output-styles/high-level.md`](output-styles/high-level.md) into `~/.claude/output-styles/`.
+
 ### Commands
 
 | Command | What it does |
