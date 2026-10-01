@@ -17,11 +17,11 @@ may not be set yet. Without `--force` the installer refuses to run anywhere but 
 
 ## What it does
 
-- Downloads every path in `MANIFEST` (from `main`): `cloud-kit/rules/*` → `~/.claude/rules/`,
+- Downloads the `MANIFEST` paths under these four trees (from `main`): `cloud-kit/rules/*` → `~/.claude/rules/`,
   `cloud-kit/hooks/*` → `~/.claude/hooks/`, `commands/` and `skills/` → `~/.claude/`.
 - Prunes files a previous run installed that `MANIFEST` no longer lists (`~/.claude/.cloud-kit-files`).
-- Merges `~/.claude/settings.json`: Concise output style, `autoCompactWindow`, Sonnet sub-agents,
-  and the Stop / PostToolUse / SessionStart hooks (replaced in place on upgrade, never duplicated).
+- Merges `~/.claude/settings.json`: forces the Concise output style; sets `autoCompactWindow` and Sonnet
+  sub-agents only if unset; and adds the Stop / PostToolUse / SessionStart hooks (replaced in place on upgrade, never duplicated).
   An unparseable settings file is left untouched.
 - The SessionStart hook re-runs the installer in the background, so each session gets the latest kit.
 - Installs the `superpowers` and `everything-claude-code` (pinned `v1.10.0`) plugins once.
