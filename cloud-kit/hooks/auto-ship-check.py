@@ -21,9 +21,11 @@ from datetime import datetime
 
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
-DOC_EXT = (".md", ".txt", ".rst")
-# Docs that ARE behaviour (prompts, rules, skills, dependency lists) still count as code.
-NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks)/|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$|(^|/)(requirements[^/]*|CMakeLists|robots)\.txt$", re.I)
+# Allowlist: only plain notes/handoffs/docs count as docs. Anything else (prompts, rules,
+# skills, deployed content, dependency lists) is treated as code.
+DOC_FILE = re.compile(r"(^|/)(README|CHANGELOG|HANDOFF|NOTES|TODO|PROGRESS|LESSONS)[^/]*\.(md|txt)$"
+                      r"|(^|/)(docs|tasks|handoffs)/[^\0]*\.md$", re.I)
+NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks|\.claude)/|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$", re.I)
 OTHER_REPO = re.compile(r"\bgit\s+(?:\S+\s+)*?-C\s|\bcd\s|--git-dir|--work-tree")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
@@ -79,12 +81,44 @@ def prompt_text(entry):
 
 
 def is_doc(path):
-    return path.lower().endswith(DOC_EXT) and not NOT_DOCS.search(path)
+    return bool(DOC_FILE.search(path)) and not NOT_DOCS.search(path)
+
+
+REPO_ARG = re.compile(r"(?:\bcd|\s-C|--git-dir=?|--work-tree=?)\s*(\S+)")
+
+
+def repos_touched(cwd, cmds):
+    """Directories the turn's commands moved into (cd / git -C / --git-dir / --work-tree), plus cwd.
+    Returns None if one can't be resolved (variables, subshell tricks), meaning: assume code."""
+    dirs = {cwd} if cwd else set()
+    for cmd in cmds:
+        for raw in REPO_ARG.findall(cmd):
+            raw = raw.rstrip(";&|)")
+            if "$" in raw or "`" in raw or not raw or raw == "''":
+                return None
+            d = os.path.expanduser(raw)
+            d = d if os.path.isabs(d) else os.path.join(cwd or "", d)
+            d = os.path.normpath(d[:-5] if d.endswith("/.git") else d)
+            if not os.path.isdir(d):
+                return None
+            dirs.add(d)
+    return dirs
+
+
+def all_commits_docs_only(dirs, ts):
+    """True if every touched repo's commits since the prompt are docs-only and at least one exists."""
+    seen = False
+    for d in dirs:
+        r = commits_docs_only(d, ts)
+        if r is False:
+            return False
+        seen = seen or r is True
+    return seen
 
 
 def commits_docs_only(cwd, ts):
-    """True if every commit in cwd's repo since the prompt touches only doc files.
-    No commits found there (e.g. the commit was in another repo) counts as code."""
+    """True if every commit in cwd's repo since the prompt touches only doc files; None if that repo
+    has no commits since the prompt; False otherwise (or on any doubt)."""
     if not cwd or not ts:
         return False
     try:
@@ -92,8 +126,12 @@ def commits_docs_only(cwd, ts):
         out = subprocess.run(["git", "-C", cwd, "log", "--date-order", f"--since={since}", "-m", "--no-renames",
                               "--name-only", "-z", "--format=", "HEAD"],
                              capture_output=True, text=True, timeout=3)
+        if out.returncode != 0:
+            return False
         files = [f.strip() for f in out.stdout.split("\0") if f.strip()]
-        return out.returncode == 0 and bool(files) and all(is_doc(f) for f in files)
+        if not files:
+            return None
+        return all(is_doc(f) for f in files)
     except Exception:
         return False
 
@@ -142,6 +180,10 @@ def main():
     changed = shipped = delegated = False
     cwd = payload.get("cwd")
     docs_only = None  # computed once, on the first commit seen
+    bash_cmds = [QUOTED.sub("''", strip_heredocs(str((b.get("input") or {}).get("command", ""))))
+                 for e in tail if e.get("type") == "assistant"
+                 for b in (e.get("message") or {}).get("content") or []
+                 if isinstance(b, dict) and b.get("name") == "Bash"]
     for e in tail:
         if e.get("type") != "assistant":
             continue
@@ -162,15 +204,12 @@ def main():
                 if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
-                cmd = QUOTED.sub("''", strip_heredocs(str(inp.get("command", ""))))
-                if OTHER_REPO.search(cmd):
-                    changed = True  # can't tell which repo or files: treat as code
-                else:
-                    if docs_only is None:
-                        docs_only = commits_docs_only(cwd, start.get("timestamp"))
-                    changed = changed or not docs_only
+                if docs_only is None:
+                    dirs = repos_touched(cwd, bash_cmds)
+                    docs_only = dirs is not None and all_commits_docs_only(dirs, start.get("timestamp"))
+                changed = changed or not docs_only
     if not changed and not shipped and delegated and docs_only is None:
-        changed = committed_since(cwd, start.get("timestamp")) and not commits_docs_only(cwd, start.get("timestamp"))
+        changed = committed_since(cwd, start.get("timestamp")) and commits_docs_only(cwd, start.get("timestamp")) is not True
     if changed:
         print(json.dumps({
             "decision": "block",
