@@ -329,7 +329,7 @@ The founder reads only the ending. Two outputs:
    **Needs you:** <only-you steps with deep links — omit the line if none>
    ```
    The report file is not linked in chat; give its path only if the founder asks.
-   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** starts with the state — NOT SHIPPABLE (a stage failed), or SHIPPABLE BUT NOT MERGED (ENTANGLED branch, merge failure, `--no-merge`) — then each blocker in one plain line.
+   **Every STOP / escalation in any stage ends with these same 4 lines in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** follows the definition above — the state first (NOT SHIPPABLE = a stage failed; SHIPPABLE BUT NOT MERGED = ENTANGLED / merge failure / `--no-merge`; MERGED BUT POST-MERGE FAILED = 6.5 workflows or deploy red), then every open item + why.
 
 Full-report format (file only):
 
