@@ -71,37 +71,10 @@ For MINE-TO-FIX: fix it, then **re-run the exact disconfirming experiment**. An 
 ## Phase 4: Report (only when the surface is clean)
 Every MINE-TO-FIX crack is already fixed, verified and merged. Only OWNED-ELSEWHERE and GENUINE-EXTERNAL may appear unresolved.
 
-```markdown
-# Red-Team: <scope>
-
-## Claim Ledger
-Legend (never inflate): `✅ SURVIVED` = experiment RAN, claim held. `🔬 INSPECTED` = read and looks correct, experiment NOT run (low-risk textbook patterns only; say why not run). `🔴 CRACKED` = falsified → next table.
-| Claim | Disconfirming experiment | Evidence | Outcome |
-|-------|--------------------------|----------|---------|
-| <"sends via SES"> | Real SMTP AUTH+send with the stored credential | 250 OK + receipt | ✅ SURVIVED |
-
-## Cracks found → fixed → re-proven (MINE-TO-FIX)
-| Crack | Why it was invisible | Fix (PR/SHA) | Re-attack evidence |
-|-------|----------------------|--------------|--------------------|
-
-## Owned elsewhere (tracked, not my fix)
-| Crack | Owner (PR/branch + recency) | How I confirmed it covers the crack |
-|-------|-----------------------------|-------------------------------------|
-
-## Hidden-failure sweep
-- Secrets in git: 0 (grep proof)
-- Leftovers / drift / observability / others' WIP: <each proven clean, fixed above, or flagged hands-off>
-
-## Honest residual risk
-- <Genuinely external only: credentials, business calls, platform limits + graceful degradation. NOT a backlog.>
-
-## Verdict
-**SURVIVED** — every claim attacked; every MINE-TO-FIX crack fixed + merged + re-proven; every OWNED-ELSEWHERE crack confirmed covered by a live effort.
-```
+**Read `~/Developer/unleashed-superpowers/docs/reference/red-team-report-template.md` and fill it exactly (mandatory).** Sections: Claim Ledger (Claim · Disconfirming experiment · Evidence · Outcome; legend `✅ SURVIVED` = experiment ran and held, `🔬 INSPECTED` = read only + why not run, `🔴 CRACKED`) · Cracks → fixed → re-proven · Owned elsewhere (owner + how confirmed) · Hidden-failure sweep (secrets 0 + grep proof) · Honest residual risk (genuine externals only, not a backlog) · Verdict.
 
 ## Hard rules
-- **Falsify, don't confirm.** No ✅ without an experiment that ran. Real path, effect, ground truth. Hands off others' WIP. Block only on genuine externals.
-- **Three dispositions, no fourth:** MINE-TO-FIX (fix, verify, merge), OWNED-ELSEWHERE (link + confirm), GENUINE-EXTERNAL. "Didn't bother" is not one of them.
+- **Falsify, don't confirm:** no ✅ without an experiment that ran. Three dispositions, no fourth ("didn't bother" isn't one).
 - **Attack the biggest claim first.** Rank by blast radius; the load-bearing "works end-to-end / shippable / done" claim comes before nitpicks (§ onboarding crash).
 - **Someone else's fix is still a claim.** Re-run the experiment yourself. If you can't, mark it 🔬 INSPECTED/external. Never launder their prose into your ✅.
 - **Inspection ≠ execution.** Read-but-not-run = `🔬 INSPECTED`, never `✅`. INSPECTED becomes SURVIVED only by citing a NEW experiment, never a re-read (§ uniqueness constraint).
