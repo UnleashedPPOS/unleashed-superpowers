@@ -21,7 +21,10 @@ from datetime import datetime
 
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
-DOC_EXT = (".md", ".mdx", ".txt", ".rst")
+DOC_EXT = (".md", ".txt", ".rst")
+# Docs that ARE behaviour (prompts, rules, skills, dependency lists) still count as code.
+NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks)/|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$|(^|/)(requirements[^/]*|CMakeLists|robots)\.txt$", re.I)
+OTHER_REPO = re.compile(r"\bgit\s+(?:\S+\s+)*?-C\s|\bcd\s|--git-dir|--work-tree")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
@@ -76,7 +79,7 @@ def prompt_text(entry):
 
 
 def is_doc(path):
-    return path.lower().endswith(DOC_EXT)
+    return path.lower().endswith(DOC_EXT) and not NOT_DOCS.search(path)
 
 
 def commits_docs_only(cwd, ts):
@@ -86,9 +89,10 @@ def commits_docs_only(cwd, ts):
         return False
     try:
         since = int(datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp())
-        out = subprocess.run(["git", "-C", cwd, "log", f"--since={since}", "--name-only", "--format=", "HEAD"],
+        out = subprocess.run(["git", "-C", cwd, "log", "--date-order", f"--since={since}", "-m", "--no-renames",
+                              "--name-only", "-z", "--format=", "HEAD"],
                              capture_output=True, text=True, timeout=3)
-        files = [f for f in out.stdout.splitlines() if f.strip()]
+        files = [f.strip() for f in out.stdout.split("\0") if f.strip()]
         return out.returncode == 0 and bool(files) and all(is_doc(f) for f in files)
     except Exception:
         return False
@@ -158,9 +162,13 @@ def main():
                 if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
-                if docs_only is None:
-                    docs_only = commits_docs_only(cwd, start.get("timestamp"))
-                changed = changed or not docs_only
+                cmd = QUOTED.sub("''", strip_heredocs(str(inp.get("command", ""))))
+                if OTHER_REPO.search(cmd):
+                    changed = True  # can't tell which repo or files: treat as code
+                else:
+                    if docs_only is None:
+                        docs_only = commits_docs_only(cwd, start.get("timestamp"))
+                    changed = changed or not docs_only
     if not changed and not shipped and delegated and docs_only is None:
         changed = committed_since(cwd, start.get("timestamp")) and not commits_docs_only(cwd, start.get("timestamp"))
     if changed:
