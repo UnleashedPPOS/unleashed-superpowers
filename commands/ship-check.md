@@ -1,196 +1,116 @@
 ---
-description: End-of-session production audit with auto-merge. Reconstructs session intent, then RUNS the full review chain — parallel reviewer fan-out (superpowers:code-reviewer + everything-claude-code code/security reviewers + refactor-cleaner) followed by the mutating cleanup skills (/simplify, /code-review --fix, /ux-simplify, voice-coverage-audit, doc-updater) wrapped in the superpowers requesting-/receiving-code-review loop — verifies branch topology + cross-PR interactions, captures lessons, then AUTOMATICALLY merges open PRs from this session when the verdict is SHIPPABLE and the branch is ISOLATED. Senior-dev mode — no manual hand-holding, no half-done anything, reviewers actually execute (no self-asserted "looks good"). Pass `--no-merge` to stop before the merge phase. Pass `--scope=<freeform>` to override the inferred session intent. Operates on `$ARGUMENTS` (defaults to current branch / recent commits).
+description: End-of-session production audit + auto-merge. Intent vs Definition of Done, full reviewer chain, branch-isolation gate, auto-merge when SHIPPABLE + ISOLATED, then /red-team. Flags --no-merge, --no-red-team, --scope=, --task.
 ---
 
-# /ship-check — Evidence-Based Production Audit + Auto-Merge
+# /ship-check: Evidence-Based Production Audit + Auto-Merge
 
-You are the senior engineer signing off before real users touch the code. **No gaps. No silent bugs. No security holes. No half-done anything.** If something was supposed to happen and didn't, you find it and you finish it. When the audit lands a clean verdict, you **merge the work yourself** — the user does not click anything.
+Senior engineer signing off before real users touch it: no gaps, silent bugs, security holes or half-done work. Find what's missing and finish it. On a clean verdict, **merge it yourself**.
 
-Target scope: `$ARGUMENTS` (if empty, infer from `git log origin/main..HEAD` plus the in-conversation intent — **bounded strictly to THIS session's work**, never historical PRs or unrelated branches).
+Scope: `$ARGUMENTS`, else `git log origin/main..HEAD` + this conversation's intent. **Only THIS session's work.**
 
 Flags:
-- `--no-merge` — run the full audit but stop before Phase 6. Use only when the user wants to review before shipping.
-- `--scope=<freeform>` — override the auto-inferred session intent (e.g. `--scope="PR #309 + cross-PR interactions"`).
+- `--no-merge`: full audit, stop before Phase 6. Also skips 6.7.
+- `--no-red-team`: run 0–6 but skip 6.7. Rare: only for a trivial, zero-risk change, and only when the user explicitly waives it.
+- `--scope=<freeform>`: overrides the inferred intent, e.g. `--scope="PR #309 + cross-PR interactions"`.
+- `--task`: per-task gate along the way (see Fast Path). Skips 0, 2.B–2.D, 3–6.7. Never authorizes a merge.
+
+**Lessons:** `~/Developer/unleashed-superpowers/docs/reference/ship-check-lessons.md` (incidents, rationale, governing memory files). Read the cited `§` only when a phase points there or a rule's intent is unclear.
+
+## Definition of Done (Phase 5's bar)
+1 **Built**: matches the Phase 0 intent, nothing silently descoped · 2 **Correct**: toolchain green (1.1) + both review lenses + security actually ran, 0 open Blockers (2) · 3 **Safe**: no secrets, no new security/RLS/CORS gap, no untested destructive action (1.2–1.4) · 4 **Usable**: a11y, error/empty/loading states, no dead ends (1.5–1.6) · 5 **Clean**: no dead code, docs updated, history matches intent (1.7–1.9) · 6 **Merged**: ISOLATED PR, CI green, squash, content proof (1.11, 6) · 7 **Deployed**: live artifact = merge SHA (6.6) · 8 **Exercised** once on the real path after deploy (3, 6.6) · 9 **Survived falsification** (6.7).
+Any unmet item is a ⚠️/❌ you fix, or a user-approved Deferred entry. Never a silent gap.
+
+## Prime Directive: Evidence Before Assertions
+No ✅ without proof: command output, a file quote, a DB result, a deploy ID or a SHA. Didn't run it → ⚠️. A ⚠️ is acceptable; a false ✅ is a firing offence. Cite the proving artefact on one line before each checkmark.
+
+## Model routing + token discipline
+- **Reviewer/analysis subagents: pass `model: "sonnet"`** on every `Agent` call (fan-out, report-mode refactor-cleaner, watchers, doc-updater).
+- **Opus only for:** (a) your own synthesis and final verdict (2.D, Phase 5, Phase 7), which stay in the top session; and (b) the security reviewer, which gets `model: "opus"` when the diff touches auth, payments/money, secrets, consent/compliance gates, RLS or other safety-critical paths. Otherwise sonnet.
+- **Every reviewer brief ends with:** "Return ≤300 words: findings ranked Blocker/Important/Nit, each with `file:line` evidence. No preamble, no restating the diff."
+- Brief with a file list + diff or a plan's `file:line-range`, never a whole plan. Large output (git log, build/test, repo-wide grep) goes through `ctx_execute`.
+
+## Fast Path: `--task`
+(1) 1.1 on the repo toolchain, with commands + exit codes cited. (2) ONE reviewer (`model: "sonnet"`, ≤300 words) on this task's diff, findings quoted. (3) Secrets grep on new files = 0. (4) Pass/fail in 3–4 lines. No Intent Summary, merge or Phase 7.
 
 ---
 
-## Prime Directive — Evidence Before Assertions
+## Phase 0: Reconstruct THIS session's intent
+1. `tasks/todo.md` if present (primary source).
+2. `git log origin/main..HEAD --oneline` (or vs the base branch). Each subject is a claimed deliverable.
+3. Re-read the user's early messages: what was asked for, what was deferred or parked.
+4. `tasks/lessons.md`: in-session corrections are now rules.
+5. `.claude/agent-summary.md` if subagents wrote receipts.
+6. After a compaction/resume boundary: if the user says something is done and your context disagrees, check ground truth (`gh pr list --search`, `git log --all`, live DB/deploy) before redoing it or disputing them. (lessons § Phase 0)
 
-You do not write `✅` without proof — command output, a file quote, a DB query result, a deployment ID, a git SHA. Per `superpowers:verification-before-completion`: if you did not run it, it is `⚠️` (unchecked), not `✅`. A `⚠️` in the final report is acceptable. A false `✅` is a firing offence.
+Output an **Intent Summary** (5–10 bullets: features, schema changes, new files, deprecations, parked items). Anything ambiguous → ask for one-line confirmation **before any audit runs**. Don't guess. **Scope fence:** ignore other people's PRs and unrelated branches. Mid-session merges into main belong in 1.10.
 
-Before any checkmark, write one line citing the artefact that proved it (e.g. `bun run build` exit 0; `pg_policies` row for `onboarding_rewards`; Sentry issue count = 0; `git diff --stat` showing only intended files).
+## Phase 1: Ship-readiness checklist
+Walk every section. Fix each ⚠️/❌ now unless the user deferred it in Phase 0. Cite evidence.
 
-**Memory references that govern this command:**
-- `feedback_subagent_completion_verification.md` — return strings ≠ proof of done. Verify via git log + agent-summary.md on disk + content proof. Multi-PR merge waves: GitHub `mergeable` flag LAGS; verify with `git merge-base --is-ancestor` + content proofs.
-- `feedback_merge_with_failing_checks.md` — never defer failing/pending checks. Required CI green at merge time.
-- `feedback_senior_dev.md` — apply obvious best-practice fixes autonomously; ask only on real design choices.
+### 1.1 Build, types, tests (`superpowers:verification-before-completion`)
+**Detect the toolchain first:** `Makefile` target → lockfile (`bun.lockb` bun · `pnpm-lock.yaml` pnpm · `package-lock.json`/`yarn.lock` npm/yarn · `uv.lock` uv · bare `pyproject.toml` pytest via the repo venv, never system python) → `package.json` script names.
+- [ ] Build exits 0. Cite the command + what told you to use it.
+- [ ] Lint: 0 **new** errors in session files (pre-existing ones listed separately).
+- [ ] Affected tests pass **on the repo's configured runner** (lessons § 1.1 runner).
+- [ ] Typecheck clean. Name pre-existing generated-file corruption separately.
+- [ ] No `any`/untyped escape hatch where a concrete type fits.
+- [ ] Generated type/schema files reflect this session's schema changes (regenerate, or check `information_schema.columns`).
+- [ ] Each new pure function/invariant has ≥1 assertion. Destructive UI/CLI actions have a confirmation step or a test.
+- [ ] **No self-contradicting tests/evals/fixtures:** grep the corpus for a near-identical input with a different expected outcome for each case you added, and resolve any hit.
 
----
+### 1.2–1.8 Conditional checklists → **read `~/Developer/unleashed-superpowers/docs/reference/ship-check-checklists.md`** for each section the diff triggers (unsure → read it)
+1.2 DB/migrations (live SELECT proof, RLS + policy, `schema_migrations` drift, advisories) · 1.3 edge/serverless (deployed ≥ last commit, auth, server-side validation, delimited LLM input, checked writes) · 1.4 security/privacy beyond the secrets grep (no PII in logs, sanitizer, CORS, LLM PII; auto-invoke `everything-claude-code:security-review`) · 1.5 a11y (any UI) · 1.6 UX failure paths + no auth-race bounces (any UI/mutation/routing) · 1.7 dead code (any code) · 1.8 docs (any code). Every section gets a Phase 7 row; untriggered = `n/a — <why>`.
+- [ ] **Always, every diff:** `git grep -rnE "(sk_|AKIA|AIza|eyJ[A-Za-z0-9_-]{20,})"` on new files → 0 · no `user_id`/email/phone/query keys in toasts or logs · user-facing errors go through the repo's sanitizer, never raw `String(error)`/stack.
+- [ ] **1.2 drift check is MANDATORY** whenever this session changed the DB by any route (migration file, ORM/codegen schema, SQL run out-of-band, RLS/policy/function edit).
 
-## Phase 0 — Reconstruct THIS Session's Intent
+### 1.9 Git hygiene
+- [ ] One concern per commit · nothing from this session left uncommitted · branch pushed · no secrets, `.env` or large binaries (`git diff --stat origin/main..HEAD`).
+- [ ] **Committed-files-vs-intent:** run `git show --name-only <sha>` on each of YOUR commits and check every file against the Phase 0 intent (plus `git log --name-only origin/main..HEAD` for unrelated working-tree changes). Strays: split them out if unmerged, flag loudly if merged.
 
-You cannot judge "complete" without the goal. Bounded strictly to this conversation's work. In order:
+### 1.10 Cross-PR interactions
+- [ ] `git log <session-start-sha>..origin/main --oneline`. For each PR that landed mid-session: does it touch your files, imports or schema? On overlap, re-run the relevant Phase 1 subset on the rebased state.
+- [ ] Use the **three-dot** diff (`origin/main...HEAD`) or rebase first. Two-dot on a stale base shows phantom deletions (lessons § 1.10).
 
-1. **Read `tasks/todo.md`** (project root) if present — primary source for stated goals.
-2. **`git log origin/main..HEAD --oneline`** (or vs the base branch) — every commit subject is a claimed deliverable.
-3. **Re-read the user's early messages in this conversation** — what was actually asked for, what was deferred, what was parked.
-4. **Read `tasks/lessons.md`** for in-session corrections — those are rules you now must honour.
-5. **Read `.claude/agent-summary.md`** if any subagents wrote receipts this session — that is the running ledger.
-
-Output an **Intent Summary** (5–10 bullets): features shipped, schema changes, new files, deprecations, parked items. If anything is ambiguous (e.g. user said "the stuff we discussed"), ask for one-line confirmation **before any audit runs**. Do not guess.
-
-**Scope fence:** ignore anything outside this session — other people's PRs, historical work, unrelated branches. If a recent merge into main interacts with your work, that lands in Phase 5 (cross-PR check), not Phase 0.
-
----
-
-## Phase 1 — Ship-Readiness Checklist
-
-Walk every section. For each `⚠️` or `❌`: **fix it in this session** unless the user has explicitly deferred it in Phase 0. Cite evidence.
-
-### 1.1 Build, Types, Tests (`superpowers:verification-before-completion`)
-- [ ] `bun run build` exits 0
-- [ ] `bun run lint` — zero **new** errors from this session's files (pre-existing called out separately)
-- [ ] `bunx vitest run` (or the affected suite) passes — never `bun test` (wrong runner per repo memory)
-- [ ] `bunx tsc -p tsconfig.app.json --noEmit` clean (ignore pre-existing `types.ts` corruption if present; flag separately)
-- [ ] No `any` where a concrete type would cover
-- [ ] `src/integrations/supabase/types.ts` reflects schema changes this session (query `information_schema.columns` to verify parity)
-- [ ] Every new pure function / data invariant has at least one vitest assertion
-- [ ] Destructive UI actions (delete, overwrite) have confirmation OR are covered by a test
-- [ ] **No self-contradicting tests/evals/fixtures.** For every test or eval case ADDED this session, grep the existing corpus for a case with a near-identical input but a *different* expected outcome (e.g. two "feeling X today" cases expecting different tools). A contradiction means at least one is wrong or the routing rule is undefined — resolve it (pick the canonical expectation, fix both) before shipping. A contradictory corpus produces flaky, meaningless green.
-
-### 1.2 Database & Migrations — **Migration Drift Verification Mandatory** (per `supabase/CLAUDE.md`)
-- [ ] Every new file in `supabase/migrations/` has been **applied** — verify via Supabase MCP querying `information_schema.columns` / `pg_indexes` / `pg_policies`. **"Ran the CLI" is not evidence; only a SELECT against the live project is.**
-- [ ] Every new table has RLS enabled and an owner-pattern policy (`user_id = auth.uid()` or parent-ownership via `EXISTS`). Prove with a `pg_policies` row.
-- [ ] Columns filtered at query time have an index (check `pg_indexes`).
-- [ ] `supabase_migrations.schema_migrations` has a row for every repo migration (diff `ls supabase/migrations/` against the table). If diverged, `supabase migration repair --status applied <ts>` per the cleanup pattern documented in `.claude/agent-summary.md` Backend Cleanup section.
-- [ ] `mcp__supabase__get_advisors(type='security')` and `get_advisors(type='performance')` — zero **new** advisories on this session's tables.
-
-### 1.3 Edge Functions (project convention: `verify_jwt=false` + in-code `getClaims`)
-- [ ] Deployed version matches repo — `mcp__supabase__list_edge_functions` → `updated_at` newer than last `git log` touching the function.
-- [ ] Auth via `supabase.auth.getClaims(token)` (not `.getUser()`).
-- [ ] Rate-limited via `rateLimitDb` on any user-facing endpoint.
-- [ ] Wrapped in `withObservability(...)`.
-- [ ] Server-side input validation: numbers clamped, enums against allow-lists, strings length-capped.
-- [ ] User-generated text in an LLM prompt lives in the `user` role wrapped in explicit delimiters (`<context>…</context>`); never raw in `system`.
-- [ ] Every `JSON.parse` / `response.json()` is in `try/catch` or guarded (`Array.isArray` etc.).
-- [ ] `supabase/config.toml` `[functions.<name>]` has `verify_jwt = false`.
-- [ ] Silent-write protection: every `await supabase.from(X).{insert,update,upsert,delete}(...)` wrapped with `assertWriteOk` / `assertOk` per the Voice Wave 3 pattern (PR #279).
-
-### 1.4 Security & Privacy (auto-invoke `everything-claude-code:security-review` skill when applicable)
-Auto-trigger if this session touched: authentication, user input, API endpoints, secrets, payments, or new edge functions.
-- [ ] `git grep -rnE "(sk_|AKIA|AIza|eyJ[A-Za-z0-9_-]{20,})"` on new files — zero hits.
-- [ ] Toast messages / logs do not leak `user_id`, email, phone, or query keys. Use hashed `user_bucket` (per `feedback_sentry_gdpr_identifiers.md`).
-- [ ] CORS via `getCorsHeaders(req)`, not `*`.
-- [ ] Frontend uses `extractErrorMessage(e)` from `@/lib/error-utils`, never `String(error)` (CLAUDE.md rule).
-- [ ] Any PII sent to an LLM is justified and minimised (titles over bodies, clamped snippets).
-
-### 1.5 Accessibility
-- [ ] Dynamic / rotating content has `aria-live="polite"` or equivalent.
-- [ ] Motion respects `prefers-reduced-motion` (`useReducedMotion()` from framer-motion).
-- [ ] Interactive elements have accessible names (`aria-label`, visible text, or both).
-- [ ] Hover-only interactions have keyboard / touch equivalents (focus pause, delayed unpause).
-
-### 1.6 UX Failure Paths
-- [ ] Every mutation has `onError` that surfaces the real reason via `extractErrorMessage`.
-- [ ] 429 / 402 responses become human toasts ("Rate limited", "Credits exhausted").
-- [ ] Empty states exist for brand-new users.
-- [ ] Loading states exist for every `useQuery` (Skeleton or spinner).
-- [ ] No silent route bounces — every Protected/Gated component gates on `loading` BEFORE redirecting (per PR #309 auth-race lesson). Grep `src/` for `isAuthenticated` callers; flag any that don't gate on `loading`.
-
-### 1.7 Dead Code & Simplicity
-- [ ] No unused imports, variables, or exports introduced.
-- [ ] No duplicated query / mutation logic across ≥2 consumers — lift to a hook.
-- [ ] No commented-out code "just in case".
-- [ ] No dead defensive defaults (`X[slot] ?? 10_000` when `X` is typed `as const` with fixed length).
-
-### 1.8 Docs (per `CLAUDE.md`: "A code change without a doc update counts as incomplete")
-- [ ] Every touched feature module has its `docs/feature-modules/<module>/` updated: README / behaviour / edge-functions / hooks / schema.
-- [ ] Voice Coverage Matrix in `future.md` reflects new actions (rows added; closed rows flipped).
-- [ ] `CLAUDE.md` updated if a new project-wide convention was introduced.
-- [ ] If the module has no docs folder yet, invoke `/document-feature-module <module>`.
-
-### 1.9 Git Hygiene
-- [ ] Every commit subject describes one discrete concern.
-- [ ] No uncommitted staged work belongs to this session.
-- [ ] Unrelated working-tree changes are **not** in session commits — run `git log --name-only origin/main..HEAD`; spot files that do not belong to the stated intent.
-- [ ] **Committed-files-vs-intent diff (explicit).** For every commit YOU authored this session, run `git show --name-only <sha>` and check EACH file against the Phase 0 intent. Any file not tied to the stated intent is a stray that rode along (this session swept `.claude/commands/red-team.md` into a voice-fix commit). Flag it; split it out with `git rebase`/`git reset` if not yet merged, or note it loudly if it is.
-- [ ] Branch is pushed.
-- [ ] No secrets, `.env`, or large binaries staged by accident (`git diff --stat origin/main..HEAD`).
-
-### 1.10 Cross-PR Interaction Audit (NEW)
-Anything that merged into main DURING this session could collide with your work. Check:
-- [ ] `git log <session-start-sha>..origin/main --oneline` — list of "other" PRs that landed mid-session.
-- [ ] For each, scan the diff: does it touch a file you touched? An import you added? A schema you altered?
-- [ ] If overlap: re-run the relevant subset of Phase 1 against the rebased state. Flag any new conflict / regression.
-
-### 1.11 Branch Topology & Merge-Isolation Gate (NEW — run BEFORE assuming anything about merge)
-A session's worst blind spot is treating "merge it" as trivial when the branch is actually a many-commit, multi-author, no-PR shared track. **Compute the branch's real shape before Phase 5/6, every time:**
-- [ ] **Commits ahead:** `git rev-list --count origin/main..HEAD`. If > your own session commit count, the branch carries other work you'd ship as a side effect.
-- [ ] **Authorship:** `git log origin/main..HEAD --format='%an %s'`. List which commits are YOURS vs others'. If foreign commits exist, your work is **not** isolable — any merge to main ships theirs too.
-- [ ] **PR existence:** `gh pr list --head <branch> --state open`. No PR + many commits ahead = this is an integration branch, not a feature PR. Merging it is a track-level cutover, not a fix landing.
-- [ ] **Live concurrency:** is anyone else still pushing? Check `git log` for foreign commits dated after your session start, a `.git/index.lock` collision, or a commit landing on top of your push. A live shared branch must NOT be merged out from under active work.
-- [ ] **Isolation verdict:** classify the merge as **ISOLATED** (your commits only / a dedicated PR) or **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes).
-  - **ISOLATED** → Phase 6 auto-merge is in play.
-  - **ENTANGLED** → auto-merge is **forbidden**. Squashing a multi-author track to main as a side effect of your fix is a firing offence. Surface the scope decision to the user (`AskUserQuestion`): merge the whole track now / open PR + hold / leave merge to the track owner. NEVER guess. Opening the PR for CI visibility is fine; merging is not.
+### 1.11 Branch topology & merge-isolation gate (always, before 5/6)
+- [ ] `git rev-list --count origin/main..HEAD` vs your commit count · authorship (`git log origin/main..HEAD --format='%an %s'`) · PR exists (`gh pr list --head <branch> --state open`; no PR + many commits = integration branch) · CI `on:` triggers (PRs excluded → empty `gh pr checks` = "never ran", say so) · live concurrency (foreign commits after session start, `.git/index.lock`, a commit on top of your push).
+- [ ] **ISOLATED** (your commits only / a dedicated PR) → Phase 6 may proceed. **ENTANGLED** (foreign commits, no dedicated PR, or live pushes) → auto-merge **forbidden**. `AskUserQuestion`: merge the whole track / open PR + hold / leave it to the track owner. Never guess. A PR opened for CI visibility is fine (lessons § 1.11).
 
 ---
 
-## Phase 2 — Run the Missing Review Passes (in order) — MANDATORY, NOT SKIPPABLE-BY-ASSERTION
+## Phase 2: Review passes (MANDATORY, not skippable by assertion)
+A pass counts **only** if its agent ran **in this conversation** and you quote its findings (a run earlier in this conversation counts if you cite its agent id + findings). "Tests pass + I eyeballed the diff" is not a review. **SHIPPABLE is forbidden** until every applicable pass has run (lessons § 2). Reviewers are read-only and run in parallel. Fix skills mutate the tree, so they run sequentially, one commit each.
 
-**A pass counts as "ran" ONLY if the actual review agent executed and produced findings you can quote — in THIS conversation.** "Tests pass + I eyeballed the diff" is NOT a code review. "Looks secure" is NOT a security review. A real failure mode this guards against: marking the audit done while these agents never ran, only for the code-reviewer to later find a real bug that would otherwise have shipped. So:
-- You may "skip" a pass **only** if its agent genuinely ran earlier in this same conversation AND you cite the agent id / its findings. Absent that proof, you MUST invoke it now.
-- The Phase 7 "Automated Passes" table requires a cited artefact per row (agent id, quoted finding count, or commit SHA of the fix). A row marked `ran` with no evidence is a false `✅` — same firing offence as elsewhere.
-- A **SHIPPABLE** verdict is forbidden if any applicable pass did not actually execute this session.
+### 2.A Reviewer fan-out (read-only, parallel: one message, multiple `Agent` calls, from THIS top-level session)
+**Never** delegate review+fix+merge to a background orchestrator that spawns its own reviewers (it parks forever), and never spawn a second agent to "resume" one. Delegate the reviewing, never the acting (lessons § 2.A). Every call: `model: "sonnet"` (security: see Model routing), a scope-fenced brief, and the ≤300-word return clause. Quote findings back after each returns. Run **all that apply**:
+1. **Code review, two independent lenses:** `superpowers:code-reviewer` AND `everything-claude-code:code-reviewer` (or a language reviewer for a single-language diff: `python-reviewer`, `go-reviewer`). Diff/merge their findings.
+2. **Security:** `everything-claude-code:security-reviewer`. MANDATORY if the session touched auth, input, endpoints, secrets, payments, edge functions or LLM prompts. Blockers get fixed before merge.
+3. **Dead code / duplication:** `everything-claude-code:refactor-cleaner` in REPORT mode (identify only).
+4. **Repo-specific coverage audit** (e.g. `voice-coverage-audit`), scoped to the touched module, if the repo defines one.
 
-**Run EVERY applicable pass below — running the full review chain is a primary reason this command exists.** Skipping the review fan-out and self-asserting "looks good" is the exact failure that shipped a real bug past a "passed" audit. Reviewers are read-only and run in parallel; cleanup/fix skills mutate the tree and run sequentially, each its own commit.
+Anti-watchdog: **≤3 reviewers per wave** (4+ trips the watchdog), or two waves. ≤2 background subagents.
 
-### 2.A — Reviewer fan-out (READ-ONLY, run IN PARALLEL — one message, multiple Agent calls)
-These don't touch the tree, so dispatch them concurrently and collect structured findings. Give each a tight, scope-fenced brief (exact file list + the diff), and require findings ranked Blocker / Important / Nit with `file:line` evidence. Run **all that apply**:
+### 2.B Cleanup + fix (mutating, sequential, separate commits; never smuggle a fix into an unrelated commit)
+5. **Simplify:** the `/simplify` skill on changed files, then action refactor-cleaner's findings (remove if cheap; park large consolidations in the repo's tracking doc, e.g. `future.md`, with a reason). Commit `refactor(...)`.
+6. **Correctness fix:** `/code-review --fix` to apply the 2.A findings. Fix every Blocker + real-impact Important. Nits: one batched commit or deferred with a one-liner. Re-run tests. Commit `fix(...)`.
+7. **UX friction:** the repo's UX-simplify skill (advisory) on the primary pages touched, or a manual pass that surfaces the top 1–2 issues. Park the rest in the tracking doc.
+8. **Docs sync:** `doc-updater` agent (`model: "sonnet"`), `/update-docs` or `/document-feature-module <module>`, covering module docs + any tracking doc (e.g. the Voice Coverage Matrix). Commit `docs(...)`.
 
-1. **Code review (two independent lenses — run both):**
-   - `superpowers:code-reviewer` agent (the superpowers reviewer — the user explicitly wants superpowers in the chain), AND
-   - `everything-claude-code:code-reviewer` agent (or the language-specific reviewer when the diff is mostly one language: `everything-claude-code:python-reviewer`, `everything-claude-code:go-reviewer`).
-   Two independent reviewers catch what one rationalises past. Diff/merge their findings.
-2. **Security review** — `everything-claude-code:security-reviewer` agent. MANDATORY if the session touched auth, user input, API endpoints, secrets, payments, edge functions, or LLM prompts. Blockers fixed before merge, no exceptions.
-3. **Dead-code / duplication analysis** — `everything-claude-code:refactor-cleaner` agent in REPORT mode (identify only) so its findings feed the sequential apply step below without racing the other reviewers.
-4. **Voice coverage** — `voice-coverage-audit` skill scoped to the touched module if any voice/Stream surface changed.
+### 2.C Superpowers review loop (part of the chain, not decoration)
+`superpowers:requesting-code-review` frames what was built and what to scrutinise. `superpowers:receiving-code-review` triages the combined 2.A findings into fix-now vs defer.
 
-Anti-watchdog (per `feedback_subagent_completion_verification.md`): **cap concurrency at ≤3 reviewers per wave** — 4+ parallel agents reliably trips the harness watchdog. If more than 3 reviewers apply, run them in two waves (e.g. code+security+refactor, then voice-coverage+lang-specific) rather than all at once; keep background subagents ≤2. Every brief carries the scope-fence file list and a "return findings as a ranked list with file:line, do not fix" instruction. After each returns, verify by quoting its actual findings — never the return string alone.
-
-### 2.B — Cleanup + fix skills (MUTATING, run SEQUENTIALLY, each its own commit)
-After the reviewers report, apply fixes. These edit the working tree, so they run one at a time, each committed separately (never smuggle a review fix into an unrelated commit):
-
-5. **Simplify / refactor** — invoke the `simplify` skill (`/simplify`) on the changed files: reuse, simplification, efficiency, and altitude cleanups, applied. Then action the `refactor-cleaner` dead-code findings from 2.A (remove if cheap; park large consolidations in `future.md` with a reason). Commit: `refactor(...): ...`.
-6. **Correctness review-and-fix** — invoke the `code-review` skill (`/code-review --fix`) to apply the correctness/cleanup findings the reviewers in 2.A surfaced. Every Blocker and every real-impact Important is fixed; Nits batched into one follow-up commit or deferred with a one-liner. Re-run the relevant tests after. Commit: `fix(...): ...`.
-7. **UX simplify** — `ux-simplify` skill (`/ux-simplify`) on the primary page(s) touched. Advisory only (never auto-applies) — surface the top 1–2, park the rest in `future.md`.
-8. **Docs sync** — `doc-updater` agent (or `/update-docs` / `/document-feature-module <module>`) so every touched module's docs + Voice Coverage Matrix reflect the change (CLAUDE.md rule #7). Commit: `docs(...): ...`.
-
-### 2.C — Superpowers review loop (the explicit superpowers entwine)
-Wrap the whole pass in the superpowers review discipline:
-- `superpowers:requesting-code-review` skill to frame what was built and what to scrutinise before merge, and
-- `superpowers:receiving-code-review` skill to triage the combined findings from 2.A into fix-now vs defer.
-This is the structured "I finished — now prove it's good" loop; it is part of the chain, not optional decoration.
-
-### 2.D — Synthesis gate
-Merge all findings into one list, dedupe, and resolve: every Blocker fixed + re-tested, every real-impact Important fixed or explicitly user-deferred, Nits batched/parked. The Phase 7 Automated-Passes table gets one row per pass above with a **cited artefact** (agent id, quoted finding count, or fix commit SHA). **A pass with no cited evidence did not run — and SHIPPABLE is forbidden until it does.**
+### 2.D Synthesis gate (Opus, top session)
+Merge + dedupe all findings. Every Blocker is fixed + re-tested. Every real-impact Important is fixed or user-deferred. Nits are batched or parked. Phase 7's Automated Passes table gets one row per pass with a **cited artefact** (agent id, quoted finding count or fix SHA). No evidence = didn't run = no SHIPPABLE.
 
 ---
 
-## Phase 3 — Smoke Verification (mandatory if any code changed)
+## Phase 3: Smoke verification (mandatory if any code changed)
+- **Edge/serverless touched:** `supabase functions logs <name>` (via `ctx_execute`) or `wrangler tail`/`vercel logs`/CloudWatch, last hour. Confirm a 2xx from your deploy. 0 invocations → "deployed, not smoked": hit it before declaring done.
+- **Error tracker** (Sentry etc.; find its MCP via ToolSearch), filtered to session files. Any unresolved error this session introduced = **blocker**.
+- **Preview** (UI touched): `preview_start`, screenshot the primary surface, console + network for the last minute: 0 unexpected console errors.
+- **e2e** (user-facing flow shipped): `everything-claude-code:e2e` or `mcp__playwright__browser_*`. Run existing e2e.
 
-Trust nothing. Prove it.
-
-- **Edge functions touched** — `mcp__supabase__get_logs(service='edge-function')` filtered by function name in the last hour. Confirm a 200 from your deploy. If zero invocations yet: "deployed but not smoked — manual hit before declaring done."
-- **Sentry** — `mcp__69d67893-09e0-414d-9e82-7bb4e7df8ce4__search_issues` with `component:<function-name>` or browser filters touching new files. Any unresolved error introduced by this session = **blocker**.
-- **Preview server** — if a UI page was touched: `mcp__Claude_Preview__preview_start`, take one screenshot of the primary surface, grab `preview_console_logs` and `preview_network` for the last minute. Zero unexpected console errors is the bar.
-- **Playwright e2e** — if the session shipped a user-facing flow: invoke `everything-claude-code:e2e` to generate / run the journey, or via `mcp__playwright__browser_*` for ad-hoc verification. If e2e already exists, run it.
-
----
-
-## Phase 4 — Capture Lessons (mandatory if any user correction landed)
-
-Per the user's standing rule: after any correction, append to `tasks/lessons.md` with the pattern + preventive rule. Skip only if zero corrections happened.
-
+## Phase 4: Capture lessons (mandatory if any user correction landed)
+Append to `tasks/lessons.md`, commit separately:
 ```md
 ## <date> — <short name>
 **Pattern:** <what Claude did wrong>
@@ -198,154 +118,29 @@ Per the user's standing rule: after any correction, append to `tasks/lessons.md`
 **Example:** <file / command / one-liner>
 ```
 
-Commit the lesson separately.
+## Phase 5: Pre-merge verdict
+- **SHIPPABLE**: all Phase 1 ✅ or user-Deferred; Phase 2 passes **actually ran** (cited), 0 unaddressed Blockers/Importants; Phase 3 confirms behaviour; Phase 4 done. 1.11 = ISOLATED → Phase 6 (unless `--no-merge`). If ENTANGLED, the work is SHIPPABLE but auto-merge is OFF; escalate per 1.11.
+- **SHIPPABLE WITH CAVEATS**: non-blocking gaps the user approved → merge and surface the caveats.
+- **NOT SHIPPABLE**: any Blocker remains → STOP. Don't merge. Report the blocker and where its fix lives, then wait for the user.
+
+## Phase 6: Auto-merge (verdict ≠ NOT SHIPPABLE, no `--no-merge`)
+**6.0 Precondition:** 1.11 = ISOLATED. If ENTANGLED, follow the user's 1.11 choice. **6.1–6.6 → read `~/Developer/unleashed-superpowers/docs/reference/ship-check-merge-runbook.md` before the first merge (mandatory).** Summary: merge only your-commits-only session PRs · required checks `pass`, never pending (≤5×60s polls, else ONE sonnet watcher, 10-poll cap) · conflicts via `merge-tree --write-tree` exit code, never `mergeable` · `--squash` · content proof (`merge-base --is-ancestor` + `git grep` symbol on origin/main) · oldest first, re-merge-tree after each · close-out: 0 in-scope open PRs, drift workflows green, receipts to `.claude/agent-summary.md` · 6.6 deploy proof per deployable tied to the merge SHA + one real request.
+
+## Phase 6.7: Adversarial verification (`/red-team`, auto-chained)
+Runs on SHIPPABLE / WITH CAVEATS unless `--no-merge` or `--no-red-team`. Auditing your own output is not independent verification.
+- Invoke `red-team` **scoped to this session's work** (same fence as 0/1.10), not as a fresh repo-wide audit.
+- Triage 🔴 CRACKED per red-team's dispositions (MINE-TO-FIX / OWNED-ELSEWHERE / GENUINE-EXTERNAL). MINE-TO-FIX gets fixed + re-proven + re-merged before this verdict stands.
+- Fold its Claim Ledger verdict into the Phase 7 report, not a separate one. `/red-team` stays independently invocable.
 
 ---
 
-## Phase 5 — Pre-Merge Final Verdict
-
-Compute the verdict from Phases 0–4. The verdict drives Phase 6.
-
-- **SHIPPABLE** — every section in Phase 1 is `✅` or has a user-approved `Deferred` entry. Phase 2 passes **actually ran this session** (cited evidence) with zero unaddressed Blockers/Importants. Phase 3 smoke checks all confirm intended behaviour. Phase 4 lessons captured. The Phase 1.11 isolation verdict is **ISOLATED**. **→ proceed to auto-merge (Phase 6) unless `--no-merge` was passed.** If the isolation verdict is **ENTANGLED**, the verdict is still SHIPPABLE for the *work* but auto-merge is OFF — escalate the merge-scope decision per 1.11 instead of merging.
-- **SHIPPABLE WITH CAVEATS** — non-blocking gaps exist but were user-approved. **→ proceed to auto-merge, surface caveats in final report.**
-- **NOT SHIPPABLE** — at least one Blocker remains. **→ STOP. Do not merge. Report the blocker and where the fix lives. Wait for explicit user direction.**
+## Phase 7: Final report (exact format, mandatory read)
+**Read `~/Developer/unleashed-superpowers/docs/reference/ship-check-report-template.md` and fill it exactly.** Sections: Intent · Checklist table (one row per 1.1–1.10 area, evidence in parens) · Automated Passes table (one row per 2.A–2.C pass incl. model, each with a cited agent id / finding count / fix SHA) · Smoke · Lessons Captured · Deferred (user-approved) · Verdict · Merges (PR#, squash SHA, content proof) · Post-Merge Deploy Proof (6.6) · Adversarial Verification (6.7 counts + verdict) · final in-scope open PR count = 0 · drift/health workflows GREEN on `<main HEAD>`.
 
 ---
 
-## Phase 6 — Auto-Merge Protocol (NEW — runs when verdict ≠ NOT SHIPPABLE and `--no-merge` not passed)
+## Hard rules (each is enforced in the phase cited)
+Evidence or ⚠️; never batch-skip with "looks fine" (Prime) · never invent work, extras go to Deferred · fix > flag for cheap/obvious items, ask only on design calls (senior-dev) · one concern per commit · whole review chain every time, never self-review (2) · reviewers on sonnet with ≤300-word returns, Opus for synthesis/verdict + safety-critical security (Model routing) · fan out from the top session, never a self-spawning orchestrator (2.A) · never nest `Agent` `isolation:"worktree"` from a non-git cwd: `git worktree add` yourself and pass the path · topology before merge, auto-merge only if ISOLATED (1.11) · empty checks ≠ green (1.11) · merge-tree exit code + ancestor + content grep, never `mergeable` (6.2) · stop at NOT SHIPPABLE whatever colour CI is (5) · scope = THIS session · merged ≠ shipped (6.6) · anti-watchdog on every subagent: tight brief, hard poll caps, incremental summary writes, pre-baked diagnosis.
 
-You merge the open PRs from this session yourself. The user does not click anything.
-
-### 6.0 Hard precondition — the Phase 1.11 isolation verdict MUST be ISOLATED
-Do not enter Phase 6 if the branch is **ENTANGLED** (foreign commits, no dedicated PR, or concurrent pushes). Merging an integration/shared branch to main as a side effect of landing your fix ships other people's unreviewed work to production and may race active commits. ENTANGLED → you already escalated the scope decision in 1.11; obey the user's choice (open-PR-and-hold / track-owner-merges / explicit merge-the-whole-track). Auto-merge only proceeds for genuinely isolated work.
-
-### 6.1 Identify in-scope PRs
-- `gh pr list --state open --search "author:@me head:<this-session's-branch>"` OR (when working without a head filter) cross-reference `git log <session-start-sha>..HEAD` with `gh pr list --state open --json number,headRefName`. Only merge PRs **whose branch matches a commit you authored in this session** AND whose commit set is yours alone (re-check authorship per 1.11). Never merge unrelated open PRs, and never merge a PR that also carries other authors' commits without explicit user go-ahead.
-
-### 6.2 For each in-scope PR — per-PR protocol
-1. **Final CI confirmation:** `gh pr checks <N>`. Required checks (`quality`, `test (1)`, `test (2)`, `test (3)`, any other required gates) must show `pass`. Non-required (`notify`, `Supabase Preview` when skipped) are fine.
-2. **Conflict check via merge-tree** (NOT `gh pr view --json mergeable` — that flag lags):
-   ```bash
-   git merge-tree $(git merge-base origin/main origin/<branch>) origin/main origin/<branch> | grep -E 'CONFLICT|<<<<<<<' | head -3
-   ```
-   Empty output = clean. Hits = STOP, escalate to the user; do not force-resolve.
-3. **Squash merge:**
-   ```bash
-   gh pr merge <N> --squash --repo <owner>/<repo>
-   ```
-4. **Content-proof verification post-merge** (per memory rule — `mergeable` lags, content is truth):
-   ```bash
-   git fetch && git merge-base --is-ancestor <squash-sha> origin/main && echo IN_MAIN || echo MISSING
-   git grep <key-symbol-from-PR-diff> origin/main -- <relevant-file>
-   ```
-   Both must succeed. If either fails → escalate immediately.
-
-### 6.3 When CI is still pending at audit time
-Do not merge with pending checks. Two paths:
-- **Inline wait** (preferred when ≤3 min): poll `gh pr checks <N>` every 60s up to 5 polls. If green, merge. If still pending, dispatch a watcher subagent (see 6.4).
-- **Watcher subagent** (for longer waits): dispatch ONE tight-scope subagent with this exact shape:
-  - Hard cap: 10 polls of 60s each.
-  - Incremental `.claude/agent-summary.md` writes after each merge.
-  - Pre-baked content-proof commands.
-  - Scope-fence: only the in-scope PRs.
-  - Anti-watchdog return shape: <200 word summary, never "I'll wait" cliffhangers.
-
-### 6.4 Cross-PR conflict surface during merge wave
-If multiple in-scope PRs are merging, merge in **squash-SHA chronological order of original branch creation** (oldest first). After each merge, re-fetch main and re-check merge-tree for the next PR. Per `feedback_subagent_completion_verification.md` multi-PR wave addendum.
-
-### 6.5 Post-merge close-out
-- Verify final `gh pr list --state open` shows zero in-scope PRs remaining.
-- Trigger fresh runs of any drift-check workflows if their last run was on a stale SHA: `gh workflow run "Migration Drift Check" --ref main`, `gh workflow run "Deploy Migrations" --ref main`, `gh workflow run "Supabase Drift Check" --ref main`. Confirm they go green.
-- Append `.claude/agent-summary.md` with section `# /ship-check auto-merge — <date>` containing each merged PR# + squash SHA + content-proof receipts.
-
----
-
-## Phase 7 — Final Report (exact format)
-
-```markdown
-# Ship-Check: <feature or branch>
-
-## Intent
-- <5–10 bullets from Phase 0>
-
-## Checklist (evidence in parens)
-| Area | Status | Notes |
-|------|--------|-------|
-| Build, Types, Tests | ✅ / ⚠️ / ❌ | `bun run build` exit 0, `bunx vitest run` X/X pass |
-| DB & Migrations | ... | columns queried in `information_schema.columns`; RLS row in `pg_policies` |
-| Edge Functions | ... | v<N> deployed, log sample timestamp |
-| Security & Privacy | ... | grep hits = 0; advisors delta = 0 |
-| Accessibility | ... | |
-| UX Failure Paths | ... | auth-race guard verified |
-| Dead Code & Simplicity | ... | |
-| Docs | ... | |
-| Git Hygiene | ... | |
-| Cross-PR Interactions | ... | N PRs landed mid-session; M overlap; all resolved |
-
-## Automated Passes (every applicable row MUST have a cited artefact — agent id / quoted finding count / fix SHA)
-| Pass | Agent/Skill | Ran (evidence) | Outcome / Commit |
-|------|-------------|----------------|------------------|
-| code-review (superpowers) | `superpowers:code-reviewer` | <agent id + N findings> | <fix SHA / none> |
-| code-review (ecc/lang) | `everything-claude-code:code-reviewer` | <agent id + N findings> | <fix SHA / none> |
-| security-review | `everything-claude-code:security-reviewer` | <agent id + verdict> | <fix SHA / none> |
-| dead-code/dup analysis | `everything-claude-code:refactor-cleaner` | <agent id + N findings> | applied in refactor SHA |
-| simplify | `/simplify` skill | <ran? diff applied> | <refactor SHA / none> |
-| code-review apply | `/code-review --fix` | <ran? findings applied> | <fix SHA / none> |
-| ux-simplify | `/ux-simplify` | <ran? top issues> | parked in future.md / none |
-| voice-coverage-audit | `/voice-coverage-audit <module>` | <ran? matrix refreshed> | <doc SHA / n/a> |
-| docs sync | `doc-updater` / `/update-docs` | <ran?> | <docs SHA / n/a> |
-| superpowers review loop | `requesting-/receiving-code-review` | <ran?> | triage outcome |
-
-## Smoke
-- Edge fn logs: <2xx timestamp or "0 invocations yet">
-- Sentry: <open issue count touching session scope>
-- Preview: <screenshot + console error count, or "n/a">
-- e2e: <pass/fail or "n/a">
-
-## Lessons Captured
-- <bullet per entry added to tasks/lessons.md, or "none — no corrections">
-
-## Deferred (user-approved)
-- <parked items with a reason each, linked to future.md>
-
-## Verdict
-**SHIPPABLE** — evidence above covers every section.
-
-## Merges (Phase 6 — auto-executed)
-| PR # | Title | Squash SHA | Content Proof |
-|------|-------|------------|---------------|
-| <N>  | ...   | <sha>      | <symbol>:<file>:<line-count>  |
-
-Final open PR count (in-scope): **0**.
-Drift / Deploy Migrations / Supabase Drift / Sentinel Health: **all GREEN** on `<main HEAD>`.
-```
-
----
-
-## Hard Rules
-
-- **Evidence or `⚠️`.** `✅` requires a cited artefact. Same rule as `superpowers:verification-before-completion`.
-- **Never batch-skip a section with "looks fine".** If you did not check, mark `⚠️`.
-- **Never invent work.** If the user's intent was narrow, do not expand "while I'm here". Surface in Deferred.
-- **Fix > flag.** Cheap & obvious (unused import, missing `aria-label`, missing `extractErrorMessage`): just fix. Flag is for design calls.
-- **One concern per commit.** Review fixes, refactors, doc updates — separate commits.
-- **Auto-merge is default — but ONLY for ISOLATED work.** When verdict ≠ NOT SHIPPABLE, `--no-merge` not passed, AND the Phase 1.11 isolation verdict is ISOLATED, you merge yourself. Verify via `git merge-base --is-ancestor` + content proof, NEVER `gh pr view --json mergeable`. If ENTANGLED (multi-author / no dedicated PR / concurrent pushes), auto-merge is OFF — escalate the scope decision, never squash a shared track to main as a side effect.
-- **Review passes are not skippable by assertion.** Code-review and security-review must actually execute this session with quoted findings before SHIPPABLE. "Tests pass + I read the diff" is not a review.
-- **Run the WHOLE review chain, every time.** The parallel reviewer fan-out (superpowers:code-reviewer + ecc code/security reviewers + refactor-cleaner) AND the mutating cleanup skills (/simplify, /code-review --fix, /ux-simplify, voice-coverage-audit, doc-updater), wrapped in the superpowers requesting-/receiving-code-review loop. Running this chain is a primary reason the command exists — never collapse it into a self-review.
-- **Always compute branch topology before merging.** `git rev-list --count origin/main..HEAD` + authorship + PR existence + live-push check. Never assume "merge" means your fix alone.
-- **Stop at NOT SHIPPABLE.** Never merge with an unresolved Blocker, regardless of CI colour.
-- **Senior-dev mode** (per user's standing preference): apply obvious best-practice fixes without asking. Only ask on real design calls.
-- **Scope = THIS session.** Phase 1.10 and Phase 6 explicitly fence against unrelated open PRs / branches / prior work.
-- **Anti-watchdog hygiene** on every dispatched subagent: tight brief, hard poll caps, incremental summary writes, pre-baked diagnosis when known.
-
----
-
-## When to Invoke
-
-Run `/ship-check` at the end of any session where a feature was built or materially changed — **before** declaring the work "done". It is the last thing you do, not the first.
-
-For long sessions (multi-phase feature build), also invoke `everything-claude-code:strategic-compact` mid-way so Phase 0 still has session intent in cache.
-
-For audit-only mode (no merge): `/ship-check --no-merge`.
-
-For overriding the auto-inferred scope: `/ship-check --scope="PR #309 + cross-PR interactions"`.
+## When to invoke
+At the end of any session that built or materially changed a feature, **before** declaring it done. Long sessions: `everything-claude-code:strategic-compact` mid-way so Phase 0 keeps the intent. `--task` is a mid-session checkpoint, never a substitute.

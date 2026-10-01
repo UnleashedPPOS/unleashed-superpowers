@@ -27,5 +27,5 @@ Legend (never inflate): `✅ SURVIVED` = experiment RAN, claim held. `🔬 INSPE
 - <Genuinely external only: credentials, business calls, platform limits + graceful degradation. NOT a backlog.>
 
 ## Verdict
-**SURVIVED** — every claim attacked; every MINE-TO-FIX crack fixed + merged + re-proven; every OWNED-ELSEWHERE crack confirmed covered by a live effort.
+**SURVIVED** — every claim attacked; every MINE-TO-FIX crack fixed + merged + re-proven; every OWNED-ELSEWHERE crack confirmed covered by a live effort. Nothing left for you to chase that is mine to chase.
 ```

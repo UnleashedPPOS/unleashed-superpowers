@@ -2,7 +2,7 @@
 
 Someone (often you) just said "done / works / merged / all good". **Try to prove it false**: hidden failure modes, silent no-ops, proxy tests that never touched the real path. Then **fix what cracks**, prove the fix, and report only when clean.
 
-Falsification, not a checklist. `/ship-check` (the broad audit + merge) auto-chains this as Phase 6.7. It also runs standalone on any high-cost claim.
+Falsification, not a checklist. `/ship-check` (the broad audit + merge) auto-chains this as Phase 6.7 (skippable only via `--no-red-team`). It also runs standalone on any high-cost claim.
 
 Scope: `$ARGUMENTS`, else this session's claims + `git log origin/main..HEAD`. **Only THIS session's work.**
 
@@ -15,10 +15,10 @@ Ask: **"what is the cheapest experiment that would FAIL if this were secretly br
 - **Close findings before reporting.** Fix, verify and merge everything MINE-TO-FIX. The only allowed returns: "Done + proof", OWNED-ELSEWHERE (linked + confirmed), "Blocked on genuine external input".
 - **Real integration path, not a proxy.** Proving a component works doesn't prove the wired path (§ SES vs SMTP).
 - **Silent empty-success is the worst failure.** 200 + `actions:[]`, an RLS-denied insert that didn't throw, a no-op that logs nothing. Assert on the *effect*, never on the absence of an error (§ silent empty-success).
-- **Disk/content over status strings** (`mergeable` lags; a subagent's "completed" can be a cutoff): `merge-base --is-ancestor` + `git grep <symbol>`. "Done" proof: migration → `information_schema` SELECT (`db query --linked`); edge fn → `updated_at` advanced + a 2xx; test → exit code + count (§ proof).
+- **Disk/content over status strings** (`mergeable` lags; a subagent's "completed" can be a cutoff): `merge-base --is-ancestor` + `git grep <symbol>`. "Done" proof: migration → `information_schema` SELECT (`db query --linked`; CLI-first per `~/.claude/rules/supabase.md`, MCP fallback); edge fn → `updated_at` advanced + a 2xx; test → exit code + count (§ proof).
 - **Senior-dev autonomy:** apply clearly-correct fixes now. Ask only on design, business or credential calls.
 - **Verification theater is a claim too.** For "reviewed / audited / security-checked": did the agent actually run? No citable findings → it didn't happen (§ arg-name mis-split).
-- **Falsify "merged / ready to merge" against branch reality:** a dedicated PR? your commits alone (`git log origin/main..HEAD --format='%an'`)? anyone still pushing? An entangled, no-PR or live branch is a finding, not a green light.
+- **Falsify "merged / ready to merge" against branch reality:** a dedicated PR? your commits alone (`git log origin/main..HEAD --format='%an'`)? anyone still pushing (foreign commit after yours, `.git/index.lock` collision)? An entangled, no-PR or live branch is a finding, not a green light.
 - **New artefacts that contradict existing ones** (same input with a different expected outcome; a new default vs the documented one): grep the corpus and resolve.
 - **A crack may already be OWNED by in-flight work.** Before fixing: `gh pr list --state open --search <area>`, `git worktree list`, last-commit recency. If it's covered → OWNED-ELSEWHERE: link it, confirm it covers the crack, mark it tracked (§ PR #368).
 - **Never mutate another agent's in-flight work.** Run `git status --porcelain` + `git worktree list` before any switch, prune, stash or reset. Foreign WIP or a foreign worktree = hands off, flag it.
