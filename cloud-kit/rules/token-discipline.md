@@ -41,6 +41,18 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
 - Sub-agents default to Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`). Pass `model: "opus"` only for
   safety-critical/independent review. Each sub-agent costs ~40k just to start — don't spawn one for
   a lookup you can do in 1-3 calls. They return a SHORT result (<300 words).
+- **Cloud first.** Anything that can run in the cloud runs in the cloud: spawn it as a one-shot cloud
+  routine (RemoteTrigger, Sonnet), not a local Agent. `Agent isolation:"remote"` silently runs LOCALLY
+  in the desktop app — it is not a cloud agent. Stay local only when the job needs this Mac: vault
+  secrets, DB/deploy CLIs, ssh to the build box, the built-in browser, or a repo with no remote.
+  At most ONE local sub-agent at a time (8GB laptop); long-running local-only jobs go on the server.
+
+## Disk hygiene (laptop is 228GB and keeps filling)
+- Remove your worktree the moment its PR merges (`git worktree remove <path>`); never leave one behind.
+- No `bun install` / `uv sync` / `npm i` in a throwaway worktree unless the task needs to run code there.
+- Don't clone a repo locally just to read it — use `gh api` / `gh repo view` or a cloud routine.
+- A daily maintenance job (`~/bin/disk-maintenance.sh`) prunes caches, merged worktrees, pushed
+  branches, idle deps, and offloads repos idle 30+ days (`restore <repo>` brings one back).
 
 ## Routines (RemoteTrigger)
 - `list` returns 300KB+ and `list_runs`/`get_run_log` ~10KB each — never poll them in a loop. Use `get`
