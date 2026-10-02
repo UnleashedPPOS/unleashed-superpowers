@@ -69,7 +69,10 @@ if os.path.exists(p):
 else:
     s = {}
 s["outputStyle"] = "High-Level"
-s.setdefault("autoCompactWindow", 200000)
+# 250000 is the kit value; the old kit default (200000) is upgraded, any other
+# value the user chose is left alone.
+if s.get("autoCompactWindow") in (None, 200000):
+    s["autoCompactWindow"] = 250000
 s.setdefault("env", {}).setdefault("CLAUDE_CODE_SUBAGENT_MODEL", "sonnet")
 hooks = s.setdefault("hooks", {})
 
