@@ -27,6 +27,16 @@ Short by default, but with **no line cap**. Leaving out something important is w
 
 One line per item, in every section. Give the end state only, never how you got there.
 
+## Size the reply to what's new
+
+- The full section format is for the FIRST report on a piece of work. Every later message in the same chat (a wake-up, a background-agent notification, a hook-forced or `/ship-check` re-run, a follow-up) reports only the delta. A new task in the same chat gets a full report.
+- Nothing new: one line ("No change. 2 open items unchanged."). Silence on a wake-up only when nothing is open.
+- A small delta: plain lines, no headers. Use section headers only when two or more sections have new content.
+- Open items already reported are not re-listed unless their state changed, and close with one line ("2 earlier open items unchanged.") so none is silently dropped.
+- Don't re-send Needs you steps, Proof or the paste-in starter the user already has. Re-send the starter only when the next action changed.
+- A not-shippable state, and any STOP or escalation, always gets the full status.
+- A quick question or one-step task gets 1-3 lines, no sections.
+
 ## Say each fact once
 
 - A fact goes in exactly one section. Don't restate a Done item in Proof, Heads-up or Remaining. Don't list the same open item in both Remaining and Needs you.

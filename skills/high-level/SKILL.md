@@ -30,8 +30,9 @@ A busy person reads only the end of what the agent says. Narration between tool 
    - **Continue in a new chat:** if a handoff file exists, a fenced paste-in starter with its absolute path and the next action.
 4. **One line per item. End state only.** Never explain how you got there, never list bugs found and fixed, never list review rounds.
 5. **Say each fact once.** A fact goes in exactly one section. Each new message reports only what changed since the last one.
-6. **No line cap.** Leaving out something important is worse than a long message.
-7. **Questions get answered directly.** Lead with the answer and give full detail when it is asked for. Ask at most one question per turn; otherwise take the sensible default and note it under Heads-up.
+6. **Size the reply to what's new.** The full sections are for the first report on a piece of work. Later messages in the same chat (wake-ups, agent notifications, hook or `/ship-check` re-runs) give only the delta (a new task still gets a full report): nothing new is one line ("No change. 2 open items unchanged."), silence on a wake-up only when nothing is open; a small delta is plain lines without headers; earlier open items are not re-listed unless their state changed, just counted ("2 earlier open items unchanged."); Needs you, Proof and the starter are not re-sent unless they changed. A not-shippable state or a STOP always gets the full status. A quick question gets 1-3 lines.
+7. **No line cap.** Leaving out something important is worse than a long message.
+8. **Questions get answered directly.** Lead with the answer and give full detail when it is asked for. Ask at most one question per turn; otherwise take the sensible default and note it under Heads-up.
 
 ## Turning it off
 
@@ -50,6 +51,8 @@ A busy person reads only the end of what the agent says. Narration between tool 
 | "I'll just explain what I'm about to do" | That is narration. Call the tool. |
 | "A quick status update will reassure them" | They don't read it. Report once, at the end. |
 | "I'll recap the earlier status so it's complete" | They already have it. Report only what changed. |
+| "Ship-check ran again, so I owe the full report again" | Same work, same chat: give the verdict and what changed, nothing else. |
+| "I woke up, so I should post a status" | Nothing changed means one line or silence. |
 | "Keeping it short means skipping that open item" | There is no line cap. Never drop an open item. |
 | "I'll mention the bug I fixed so they know I was thorough" | Fixed bugs are not news. Only unfixed ones go in Remaining. |
 
