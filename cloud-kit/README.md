@@ -20,8 +20,8 @@ may not be set yet. Without `--force` the installer refuses to run anywhere but 
 - Downloads the `MANIFEST` paths under these five trees (from `main`): `cloud-kit/rules/*` → `~/.claude/rules/`,
   `cloud-kit/hooks/*` → `~/.claude/hooks/`, `commands/`, `skills/` and `output-styles/` → `~/.claude/`.
 - Prunes files a previous run installed that `MANIFEST` no longer lists (`~/.claude/.cloud-kit-files`).
-- Merges `~/.claude/settings.json`: forces the High-Level output style (`output-styles/high-level.md`); sets `autoCompactWindow` and Sonnet
-  sub-agents only if unset; and adds the Stop / PostToolUse / SessionStart hooks (replaced in place on upgrade, never duplicated).
+- Merges `~/.claude/settings.json`: forces the High-Level output style (`output-styles/high-level.md`); sets `autoCompactWindow` to 250000 (if unset or still the old
+  200000 default) and Sonnet sub-agents only if unset; and adds the Stop / PostToolUse / SessionStart hooks (replaced in place on upgrade, never duplicated).
   An unparseable settings file is left untouched.
 - The SessionStart hook re-runs the installer in the background, so each session gets the latest kit.
 - Installs the `superpowers` and `everything-claude-code` (pinned `v1.10.0`) plugins once.

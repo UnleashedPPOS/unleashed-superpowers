@@ -30,7 +30,8 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
 - Start the NEXT job in a fresh chat (handoff + paste-in starter) once the current one is done or
   blocked only on the founder. A hook reminds after 4 auto-compactions (then every 2) — it is a
   "fresh chat for the next job" reminder, never a stop signal.
-- autoCompactWindow is 200000 — don't raise it.
+- autoCompactWindow is 250000 (was 200000) — don't raise it further. A repo's committed
+  `.claude/settings.json` overrides the user value, so never commit a different number there.
 
 ## Model + delegation
 - Opus only for design/review/hard debugging. Mechanical work (CI watching, merging, ssh/gh

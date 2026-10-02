@@ -11,7 +11,7 @@
     {
       "name": "unleashed-superpowers",
       "description": "AI-native design skills, reference-quality feature docs, the /ship-check gate, and High-Level mode (end-state-only reporting).",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "source": "./",
       "author": {
         "name": "Elliot Kelly",
