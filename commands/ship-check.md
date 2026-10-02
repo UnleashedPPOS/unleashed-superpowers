@@ -329,6 +329,7 @@ The founder reads only the ending. Two outputs:
    **Proof:** <concrete artefacts — test line, CI run link, content-proof, screenshot; more than one when several things shipped or one isn't convincing>
    **Needs you:** <every only-you step with a deep link — omit the line if none>
    ```
+   **Already reported this work in this chat?** (a re-run forced by the Stop hook, a second pass after fixes) Then chat gets the delta only: the verdict word plus anything that changed, e.g. "Ship-check: SHIPPABLE, merged #N. Nothing else changed." Don't re-send Done, Proof, Needs you or the starter the founder already has.
    One line per item in every field: the end state only, never how you got there. The report file is not linked in chat; give its path only if the founder asks.
    **Every STOP / escalation in any stage ends with this same status in chat** (never file-only): **Done** lists what IS merged and what is NOT; **Remaining** follows the definition above — the state first (NOT SHIPPABLE = a stage failed; SHIPPABLE BUT NOT MERGED = ENTANGLED / merge failure / `--no-merge`; MERGED BUT POST-MERGE FAILED = 6.5 workflows or deploy red), then every open item + why.
 

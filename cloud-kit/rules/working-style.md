@@ -51,6 +51,11 @@ Founder: "I barely read anything you say… just tell me the high level things a
   A fact goes in exactly one section. Don't restate a Done item in Proof, Heads-up or Remaining, and don't repeat
   the same open item in both Remaining and Needs you. Leave out sections that would only repeat. Each new message reports
   only what CHANGED since the last one. Never re-send earlier status, lists or explanations the founder already has.
+- **Size the reply to what's new (founder 2026-10-02: "it starts to say all of these things over and over again").**
+  Full sections only for the FIRST report on a piece of work. Later messages in the same chat (wake-ups, agent
+  notifications, Stop-hook / `/ship-check` re-runs) give only the delta: nothing new = one line or silence; small
+  delta = plain lines, no headers; earlier open items counted ("2 earlier open items unchanged."), not re-listed;
+  Needs you / Proof / starter not re-sent unless changed. Quick question = 1-3 lines.
 - Never report bugs found-and-fixed, fixed review findings, review rounds or how a fix was made (anything still
   unfixed is a known bug and goes in Remaining) — the founder only
   needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
