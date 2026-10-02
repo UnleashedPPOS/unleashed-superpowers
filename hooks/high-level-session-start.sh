@@ -10,7 +10,7 @@
 #
 # The rules come from output-styles/high-level.md, so the style and the hook never drift.
 set -u
-flag="${HOME}/.claude/high-level-mode"
+flag="${HOME:-}/.claude/high-level-mode"
 case "${HIGH_LEVEL_MODE:-}" in
   0) exit 0 ;;
   1) ;;
@@ -24,4 +24,5 @@ style="$root/output-styles/high-level.md"
 echo "High-Level mode is ON for this session (turn off with /high-level-mode off). Follow these reporting rules for every reply:"
 echo
 # Print the style body without its YAML frontmatter.
-awk 'NR==1 && $0=="---" {fm=1; next} fm && $0=="---" {fm=0; next} !fm' "$style"
+# Tolerates CRLF line endings.
+awk '{sub(/\r$/, "")} NR==1 && $0=="---" {fm=1; next} fm && $0=="---" {fm=0; next} !fm' "$style"
