@@ -72,11 +72,11 @@ Golden rule: **every factual claim resolves to a grepable symbol.** If you can't
 
 Like caveman mode, but you keep normal sentences and drop everything the reader doesn't need. No narration while the agent works, then one final message: **Done / Remaining / Heads-up / Proof / Needs you**, one line per item, each fact said once, with no line cap so open items are never dropped. Say "high-level mode" (or `/high-level`) to turn it on and "normal mode" to turn it off.
 
-To make it permanent, pick the **High-Level** output style that ships with this plugin (`"outputStyle": "High-Level"` in `~/.claude/settings.json`). Without the plugin, copy [`output-styles/high-level.md`](output-styles/high-level.md) into `~/.claude/output-styles/`.
+To make it permanent, run **`/high-level-mode on`** once. That writes a flag file (`~/.claude/high-level-mode`), and the plugin's SessionStart hook ([`hooks/high-level-session-start.sh`](hooks/high-level-session-start.sh)) then loads the rules into every new session: terminal, desktop app, IDE, resumed and compacted sessions. `/high-level-mode off` turns it off; `HIGH_LEVEL_MODE=0` skips it for one session. Use the hook or the output style, not both, or the rules load twice. This is the recommended route because the desktop app fixes a session's output style when the session starts and only lists custom styles in Settings.
 
 ### Output styles
 
-**`High-Level`** ([`output-styles/high-level.md`](output-styles/high-level.md)) — the always-on version of the `high-level` skill. Cloud sessions set up with `cloud-kit/install.sh` use it by default.
+**`High-Level`** ([`output-styles/high-level.md`](output-styles/high-level.md)) — the single source of the High-Level rules (the hook reads this file). You can also pick it as an output style for new sessions: in the terminal via `/output-style`, in the desktop app via Settings → Claude Code (copy the file into `~/.claude/output-styles/` first if the plugin's styles aren't listed). Cloud sessions set up with `cloud-kit/install.sh` use it by default.
 
 ### Commands
 
@@ -85,6 +85,7 @@ To make it permanent, pick the **High-Level** output style that ships with this 
 | `/ship-check` | The whole ship gate, one command. Runs, in order, and refuses to report success if any stage fails: **1. Verify** (repo's own gates — typecheck, lint, FULL test suite, build/export — plus the review/cleanup chain and smoke checks), **2. Red-Team** (adversarial falsification — same `red-team` skill `/red-team` uses standalone, includes the AI-native-coverage and voice-coverage attack lanes), **3. Definition of Done** (fills the ledger from `skills/definition-of-done/SKILL.md`, verdict line first — same skill `/dod` uses standalone), **4. Ship** (pre-merge verdict + automatic merge of this session's isolated PRs). `--no-merge` stops before the merge phase; `--scope=<freeform>` overrides the inferred session intent. |
 | `/red-team [scope]` | Standalone adversarial falsification pass — attacks every "it's done" claim from this session with a disconfirming experiment, fixes what cracks, reports only when clean. Also runs as `/ship-check` Stage 2 — both invoke `skills/red-team/SKILL.md`, one source of truth. |
 | `/dod <feature>` | Standalone Definition-of-Done ledger fill, verdict line first. Also runs as `/ship-check` Stage 3 — both invoke `skills/definition-of-done/SKILL.md`, one source of truth. |
+| `/high-level-mode on\|off\|status` | Turns High-Level mode on or off for this and every future session (flag file + SessionStart hook). |
 | `/ai-native-reframe` | Mid-session audit. Takes the current AI-system design and produces structured output with five sections: ENGINE, PRESENTATION, BRIDGE, GAPS, 48-HOUR PROTOTYPE. |
 | `/document-feature-module <target>` | Thin wrapper that invokes the `document-feature-module` skill against a target module. |
 

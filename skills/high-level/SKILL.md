@@ -39,8 +39,9 @@ A busy person reads only the end of what the agent says. Narration between tool 
 
 ## Making it permanent
 
-- **Plugin users:** pick the `High-Level` output style from this plugin (open the output-style picker, or put `"outputStyle": "High-Level"` in `~/.claude/settings.json`).
-- **Without the plugin:** copy `output-styles/high-level.md` from this repo into `~/.claude/output-styles/` and select it.
+- **Plugin users (recommended):** run `/high-level-mode on`. The plugin's SessionStart hook then loads these rules into every new session, on every surface. `/high-level-mode off` undoes it. Use this or the output style below, not both.
+- **Output style (optional):** pick `High-Level` for a new session (terminal `/output-style`, or desktop Settings → Claude Code). The desktop app can't change the style of a session that has already started.
+- **Without the plugin:** copy `output-styles/high-level.md` into `~/.claude/output-styles/` and select it, or paste its body into `~/.claude/CLAUDE.md`.
 
 ## Anti-pattern flags
 
