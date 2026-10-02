@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SessionStart hook: when High-Level mode is switched on, load its rules into every new
-# session (CLI, desktop app, IDE, resumed and compacted sessions alike). Output styles
+# session (CLI, desktop app, IDE), after /clear and after compaction. Output styles
 # can't do this: the desktop app fixes a session's style when it starts.
+# Runs on startup, /clear and compaction; a resumed chat already has the rules.
 #
 # On when either is true:
 #   - the flag file exists: ~/.claude/high-level-mode   (created by /high-level-mode on)
