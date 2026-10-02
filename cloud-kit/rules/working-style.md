@@ -55,7 +55,7 @@ Founder: "I barely read anything you say… just tell me the high level things a
   Full sections only for the FIRST report on a piece of work. Later messages in the same chat (wake-ups, agent
   notifications, Stop-hook / `/ship-check` re-runs) give only the delta (a new task = full report): nothing new = one line + open-item count, silence only if nothing is open; small
   delta = plain lines, no headers; earlier open items counted ("2 earlier open items unchanged."), not re-listed;
-  Needs you / Proof / starter not re-sent unless changed. Not-shippable / STOP = full status. Quick question = 1-3 lines.
+  Needs you / Proof not re-sent unless changed; starter re-sent only when the next action changed. Not-shippable / STOP = full status. Quick question = 1-3 lines.
 - Never report bugs found-and-fixed, fixed review findings, review rounds or how a fix was made (anything still
   unfixed is a known bug and goes in Remaining) — the founder only
   needs the end state. That detail lives in the ship-check report file, unlinked unless asked.
