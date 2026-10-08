@@ -46,6 +46,13 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
   - Escalate, don't retry: Haiku fails or reports uncertainty once → rerun that task on Sonnet; Sonnet stuck → Opus.
   - Split big jobs: Opus plans, Haiku does the mechanical slices, Sonnet the judgement slices, Opus reviews.
   - Routines (RemoteTrigger) follow the same table.
+- **Sonnet (or Haiku) main chat — Opus brain stays on.** If the main thread is not Opus, it MUST NOT do the
+  intelligence-heavy work itself. Hand these to an `opus` sub-agent with a self-contained brief: design/architecture,
+  diagnosing any non-obvious bug (root cause, not just the patch), hard debugging, plans for multi-step work,
+  reviews/audits/red-team, and any decision with real risk (money, security, prod data, user-visible behaviour).
+  Main thread on Sonnet = orchestrator + straightforward edits; when in doubt, ask Opus. Same for routines.
+- **Sub-agents work silently.** No progress updates or interim messages to the main chat; only one final result
+  (<300 words: outcome, evidence, open items). The main chat reports to the founder in High-Level format only.
 - Fork (`subagent_type: "fork"`) vs fresh sub-agent: fork = copy of this chat, reuses its cache, but runs on MY model
   (Opus) and carries the whole context. Fork only when the task needs what this chat already knows AND context is
   under ~60k. Otherwise a fresh Haiku/Sonnet sub-agent with a self-contained brief (cheaper per token, small context).
