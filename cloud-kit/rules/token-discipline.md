@@ -23,7 +23,7 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
 
 ## Session size
 - **Token discipline is about HOW work is done, never WHETHER.** Context size is never a reason to
-  defer, descope, skip or label work "follow-up". Big session → delegate to Sonnet sub-agents or hand off
+  defer, descope, skip or label work "follow-up". Big session → delegate to Haiku/Sonnet sub-agents or hand off
   the complete remaining list as mandatory work. Never tell the founder you're "keeping the session small".
 - Unattended work runs to completion: keep going through auto-compactions until the whole job is
   done. Never stop, pause or ask the founder to open a new chat just because context is big.
@@ -34,16 +34,25 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
   `.claude/settings.json` overrides the user value, so never commit a different number there.
 
 ## Model + delegation
-- Opus only for design/review/hard debugging. Mechanical work (CI watching, merging, ssh/gh
-  plumbing, status) → Sonnet (pass `model:`). An Opus orchestrator should delegate, not execute.
+- **Pick the cheapest model that won't hurt the outcome. Always pass `model:` explicitly** (2026-10-08):
+
+  | Tier | Use for |
+  |---|---|
+  | `haiku` | Clear, well-specified work: lookups/sweeps, CI/PR watching, status, merging, ssh/gh plumbing, renames, boilerplate, applying an exact plan step, writing tests to a given spec, doc/format fixes, log/output summarising |
+  | `sonnet` | Normal implementation: multi-file features, bug fixes with a known cause, refactors, routine review passes, research write-ups |
+  | `opus` | Main thread, design, hard debugging, audits/cross-checks/finding, safety-critical or independent review |
+
+  - Haiku briefs must be self-contained: exact files, exact change, how to verify. Vague brief → Sonnet.
+  - Escalate, don't retry: Haiku fails or reports uncertainty once → rerun that task on Sonnet; Sonnet stuck → Opus.
+  - Split big jobs: Opus plans, Haiku does the mechanical slices, Sonnet the judgement slices, Opus reviews.
+  - Routines (RemoteTrigger) follow the same table.
 - Fork (`subagent_type: "fork"`) vs fresh sub-agent: fork = copy of this chat, reuses its cache, but runs on MY model
   (Opus) and carries the whole context. Fork only when the task needs what this chat already knows AND context is
-  under ~60k. Otherwise a fresh Sonnet sub-agent with a self-contained brief (cheaper per token, small context).
-- Sub-agents default to Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`). Pass `model: "opus"` only for
-  safety-critical/independent review. Each sub-agent costs ~40k just to start — don't spawn one for
-  a lookup you can do in 1-3 calls. They return a SHORT result (<300 words).
+  under ~60k. Otherwise a fresh Haiku/Sonnet sub-agent with a self-contained brief (cheaper per token, small context).
+- Unspecified sub-agents fall back to Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`) as a safety net. Each sub-agent costs
+  ~40k just to start — don't spawn one for a lookup you can do in 1-3 calls. They return a SHORT result (<300 words).
 - **Cloud first.** Anything that can run in the cloud runs in the cloud: spawn it as a one-shot cloud
-  routine (RemoteTrigger, Sonnet), not a local Agent. `Agent isolation:"remote"` silently runs LOCALLY
+  routine (RemoteTrigger, model per the table), not a local Agent. `Agent isolation:"remote"` silently runs LOCALLY
   in the desktop app — it is not a cloud agent. Stay local only when the job needs this Mac: vault
   secrets, DB/deploy CLIs, ssh to the build box, the built-in browser, or a repo with no remote.
   At most ONE local sub-agent at a time (8GB laptop); long-running local-only jobs go on the server.
@@ -58,7 +67,7 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
 ## Routines (RemoteTrigger)
 - `list` returns 300KB+ and `list_runs`/`get_run_log` ~10KB each — never poll them in a loop. Use `get`
   on one id, or save to a file and summarise with python. Don't create "re-check CI" routines per PR;
-  one watcher for all. Give routines an explicit Sonnet model unless they review safety-critical work.
+  one watcher for all. Give routines an explicit model per the table (Haiku for watchers/status, Sonnet for builds, Opus for safety-critical review).
 - Booked routines are prompt SNAPSHOTS: when /red-team, /ship-check or a rule changes, re-template the
   pending ones (2026-10-01: 4 rebuilt by hand). Do it in a small session — each update echoes ~9k tokens.
 
