@@ -34,34 +34,27 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
   `.claude/settings.json` overrides the user value, so never commit a different number there.
 
 ## Model + delegation
-- **Pick the cheapest model that won't hurt the outcome. Always pass `model:` explicitly** (2026-10-08):
+- **Use the agent files, don't pick by hand** (2026-10-08). `subagent_type` sets model + effort for you:
 
-  | Tier | Use for |
-  |---|---|
-  | `haiku` | Clear, well-specified work: lookups/sweeps, CI/PR watching, status, merging, ssh/gh plumbing, renames, boilerplate, applying an exact plan step, writing tests to a given spec, doc/format fixes, log/output summarising |
-  | `sonnet` | Normal implementation: multi-file features, bug fixes with a known cause, refactors, routine review passes, research write-ups |
-  | `opus` | Main thread, design, hard debugging, audits/cross-checks/finding, safety-critical or independent review |
+  | Agent | Model | Use for |
+  |---|---|---|
+  | `haiku-worker` | haiku | Clear, fully specified work: sweeps, CI/PR watching, merging, plumbing, renames, boilerplate, exact plan steps, tests to spec, doc fixes, summaries |
+  | `sonnet-builder` | sonnet | **The default.** Normal features, known-cause fixes, refactors, routine reviews, research, write-ups |
+  | `opus-thinker` | opus | Genuinely hard or high-stakes only: design, root-causing non-obvious bugs, audits/red-team, risky decisions |
 
-  - **Always pass `effort:` too** — sub-agents may inherit the main chat's (often low) effort. Haiku `high`
-    (small model, needs the care), Sonnet `medium` (`high` for tricky fixes), Opus `high` (`xhigh` for audits/hard bugs).
-  - Haiku briefs must be self-contained: exact files, exact change, how to verify. Vague brief → Sonnet.
-  - Escalate, don't retry: Haiku fails or reports uncertainty once → rerun that task on Sonnet; Sonnet stuck → Opus.
-  - Split big jobs: Opus plans, Haiku does the mechanical slices, Sonnet the judgement slices, Opus reviews.
-  - Routines (RemoteTrigger) follow the same table.
-- **Sonnet (or Haiku) main chat — Opus brain stays on.** If the main thread is not Opus, it MUST NOT do the
-  intelligence-heavy work itself. Hand these to an `opus` sub-agent with a self-contained brief: design/architecture,
-  diagnosing any non-obvious bug (root cause, not just the patch), hard debugging, plans for multi-step work,
-  reviews/audits/red-team, and any decision with real risk (money, security, prod data, user-visible behaviour).
-  Main thread on Sonnet = orchestrator + straightforward edits. Same for routines.
-- **Don't over-route to Opus.** Sonnet is strong: it owns normal features, known-cause fixes, routine reviews,
-  research and write-ups. Opus only when the task is genuinely hard, ambiguous or high-stakes. Default to Sonnet
-  when unsure between the two; escalate to Opus if Sonnet's result is weak or uncertain.
+  - Unsure between Sonnet and Opus → Sonnet. Escalate one tier only when the result is weak or the agent says it's unsure.
+  - Haiku briefs must be self-contained (exact files, change, how to verify). Vague brief → Sonnet.
+  - Big jobs: Opus plans, Haiku the mechanical slices, Sonnet the judgement slices, Opus reviews.
+- **Effort: medium by default, raised with judgement.** All three agents start at `medium`. Pass `effort: "high"`
+  only for that specific call when it's hard (unclear root cause, security/money/prod data, a review that must
+  not miss things); `xhigh` only for the hardest audits/bugs. Never raise effort by habit.
+- **Main chat not on Opus?** It stays the orchestrator + straightforward edits; the genuinely hard thinking goes to `opus-thinker`.
 - **Sub-agents work silently.** No progress updates or interim messages to the main chat; only one final result
   (<300 words: outcome, evidence, open items). The main chat reports to the founder in High-Level format only.
 - Fork (`subagent_type: "fork"`) vs fresh sub-agent: fork = copy of this chat, reuses its cache, but runs on MY model
   (Opus) and carries the whole context. Fork only when the task needs what this chat already knows AND context is
   under ~60k. Otherwise a fresh Haiku/Sonnet sub-agent with a self-contained brief (cheaper per token, small context).
-- Unspecified sub-agents fall back to Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`) as a safety net. Each sub-agent costs
+- Ad-hoc sub-agents (no agent file) must pass `model:`; unspecified ones fall back to Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`) as a safety net. Each sub-agent costs
   ~40k just to start — don't spawn one for a lookup you can do in 1-3 calls. They return a SHORT result (<300 words).
 - **Cloud first.** Anything that can run in the cloud runs in the cloud: spawn it as a one-shot cloud
   routine (RemoteTrigger, model per the table), not a local Agent. `Agent isolation:"remote"` silently runs LOCALLY

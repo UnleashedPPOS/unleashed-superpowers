@@ -13,6 +13,10 @@ Docs-only work never triggers it: edits to .md/.mdx/.txt/.rst files (handoffs, n
 progress files) and commits whose files are all docs are ignored. Founder 2026-10-01: the
 hook re-prompted after a turn that only saved keys and updated a handoff file.
 
+Prose-only work (every changed file is .md — rules, skills, agent files, commands) still
+blocks, but asks for the LIGHT check only: confirm on main, run the repo's sync/manifest check,
+one-line report. Founder 2026-10-08: a full ship-check for a 2-line rules edit was waste.
+
 Known gap: sub-agent edits that are neither committed in the session cwd's repo nor made by
 this transcript (e.g. uncommitted work in another worktree) are not seen.
 """
@@ -129,7 +133,11 @@ def all_commits_docs_only(dirs, ts):
     return seen
 
 
-def commits_docs_only(cwd, ts):
+def is_prose(path):
+    return path.lower().endswith((".md", ".mdx", ".txt"))
+
+
+def commits_docs_only(cwd, ts, pred=is_doc):
     """True if every commit in cwd's repo since the prompt touches only doc files; None if that repo
     has no commits since the prompt; False otherwise (or on any doubt)."""
     if not cwd or not ts:
@@ -144,7 +152,7 @@ def commits_docs_only(cwd, ts):
         files = [f.strip() for f in out.stdout.split("\0") if f.strip()]
         if not files:
             return None
-        return all(is_doc(f) for f in files)
+        return all(pred(f) for f in files)
     except Exception:
         return False
 
@@ -191,6 +199,7 @@ def main():
               for b in ((e.get("message") or {}).get("content") or [])
               if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error")}
     changed = shipped = delegated = False
+    prose = True  # every changed file so far is prose (.md/.txt)
     cwd = payload.get("cwd")
     docs_only = None  # computed once, on the first commit seen
     bash_cmds = [QUOTED.sub("''", strip_heredocs(str((b.get("input") or {}).get("command", ""))))
@@ -216,16 +225,29 @@ def main():
                 fp = str(inp.get("file_path") or inp.get("notebook_path") or "")
                 if fp and not fp.startswith(SKIP_PREFIXES) and not is_doc(fp):
                     changed = True
+                    prose = prose and is_prose(fp)
             elif name == "Bash" and wrapped_git_change(str(inp.get("command", ""))):
                 changed = True
+                prose = False
             elif name == "Bash" and runs_git_change(str(inp.get("command", ""))):
                 if docs_only is None:
                     dirs = repos_touched(cwd, bash_cmds)
                     docs_only = dirs is not None and all_commits_docs_only(dirs, start.get("timestamp"))
-                changed = changed or not docs_only
+                if not docs_only:
+                    changed = True
+                    prose = prose and dirs is not None and all(
+                        commits_docs_only(d, start.get("timestamp"), is_prose) is not False for d in dirs)
     if not changed and not shipped and delegated and docs_only is None:
         changed = committed_since(cwd, start.get("timestamp")) and commits_docs_only(cwd, start.get("timestamp")) is not True
-    if changed:
+        prose = prose and commits_docs_only(cwd, start.get("timestamp"), is_prose) is True
+    if changed and prose:
+        print(json.dumps({
+            "decision": "block",
+            "reason": "[auto-ship-check] Prose-only change (.md rules/skills/agents). Run the LIGHT check, not "
+                      "the full /ship-check: confirm the commit is on origin/main, run the repo's sync/manifest "
+                      "check if it has one, then report in one or two lines.",
+        }))
+    elif changed:
         print(json.dumps({
             "decision": "block",
             "reason": "[auto-ship-check] Code changed this turn and /ship-check has not run. "

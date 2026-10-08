@@ -38,6 +38,7 @@ while IFS= read -r path; do
   case "$path" in
     cloud-kit/rules/*) dest="$CL/rules/${path#cloud-kit/rules/}" ;;
     cloud-kit/hooks/*) dest="$CL/hooks/${path#cloud-kit/hooks/}" ;;
+    cloud-kit/agents/*) dest="$CL/agents/${path#cloud-kit/agents/}" ;;
     commands/*|skills/*|output-styles/*) dest="$CL/$path" ;;
     *) continue ;;
   esac

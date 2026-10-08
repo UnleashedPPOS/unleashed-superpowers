@@ -24,6 +24,13 @@
 - `git fetch` + rebase/pull before touching a branch — other sessions push to the same branches.
 - When branches conflict on a count/number, recount the real thing; never just pick a side.
 
+## No time talk — just build (HARD RULE, 2026-10-08)
+Founder: "forget that time exists… just takes action and gets shit done."
+- Never estimate duration: no "~20 min of work", "a couple of hours", "2 weeks of building", "quick win", "big lift".
+  Size work by what it touches (files, systems, risk), never by time.
+- Never use time or effort as a reason to shrink, phase, defer or ask permission. If the founder wants it, build all of it now, to a high standard.
+- Don't ask "want me to go ahead?" for work the founder already asked for — do it, then report.
+
 ## Output — founder reads only the ending (HARD RULE, 2026-10-01)
 Public, shareable copy: `output-styles/high-level.md` + `skills/high-level/` (High-Level mode). Change the format
 there and here in the same PR so they never drift.
