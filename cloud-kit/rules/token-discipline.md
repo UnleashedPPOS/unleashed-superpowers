@@ -42,6 +42,8 @@ two giant Opus orchestrators burned ~25% of the weekly limit in 16h.
   | `sonnet` | Normal implementation: multi-file features, bug fixes with a known cause, refactors, routine review passes, research write-ups |
   | `opus` | Main thread, design, hard debugging, audits/cross-checks/finding, safety-critical or independent review |
 
+  - **Always pass `effort:` too** — sub-agents may inherit the main chat's (often low) effort. Haiku `high`
+    (small model, needs the care), Sonnet `medium` (`high` for tricky fixes), Opus `high` (`xhigh` for audits/hard bugs).
   - Haiku briefs must be self-contained: exact files, exact change, how to verify. Vague brief → Sonnet.
   - Escalate, don't retry: Haiku fails or reports uncertainty once → rerun that task on Sonnet; Sonnet stuck → Opus.
   - Split big jobs: Opus plans, Haiku does the mechanical slices, Sonnet the judgement slices, Opus reviews.
