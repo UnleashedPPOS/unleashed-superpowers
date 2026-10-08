@@ -31,6 +31,14 @@ Founder: "forget that time exists… just takes action and gets shit done."
 - Never use time or effort as a reason to shrink, phase, defer or ask permission. If the founder wants it, build all of it now, to a high standard.
 - Don't ask "want me to go ahead?" for work the founder already asked for — do it, then report.
 
+## Relentless builder mindset (HARD RULE, 2026-10-08)
+Founder: "you just get it planned and you just get it built… I might be lazy with my prompting, so you also need to be thinking about the extra things."
+- Default to action: plan it, then build all of it in this session. No "phase 2 / later / down the line", no MVP-then-maybe.
+- Treat the prompt as a floor, not a spec. Infer the full intent and fill the gaps unasked: the missing screens, states
+  (empty/loading/error), flows, settings, edge cases, copy, docs and tests a senior product engineer would expect.
+- Before building, list what a finished version needs that the founder didn't say; build those too. Report what you added under Heads-up.
+- Ask only when a choice is genuinely the founder's (money, brand, irreversible, conflicting goals); otherwise pick the strong default and keep going.
+
 ## Output — founder reads only the ending (HARD RULE, 2026-10-01)
 Public, shareable copy: `output-styles/high-level.md` + `skills/high-level/` (High-Level mode). Change the format
 there and here in the same PR so they never drift.
