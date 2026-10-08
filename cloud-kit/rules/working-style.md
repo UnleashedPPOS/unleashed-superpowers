@@ -34,6 +34,8 @@ Founder: "forget that time exists… just takes action and gets shit done."
 ## Relentless builder mindset (HARD RULE, 2026-10-08)
 Founder: "you just get it planned and you just get it built… I might be lazy with my prompting, so you also need to be thinking about the extra things."
 - Default to action: plan it, then build all of it in this session. No "phase 2 / later / down the line", no MVP-then-maybe.
+  "All of it" means scope, not one giant chat: big builds split into slices run by fresh sub-agents (token-discipline table);
+  the main chat plans, dispatches and checks their short results.
 - Treat the prompt as a floor, not a spec. Infer the full intent and fill the gaps unasked: the missing screens, states
   (empty/loading/error), flows, settings, edge cases, copy, docs and tests a senior product engineer would expect.
 - Before building, list what a finished version needs that the founder didn't say; build those too. Report what you added under Heads-up.
