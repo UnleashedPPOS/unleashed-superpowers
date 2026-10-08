@@ -14,7 +14,7 @@ Read by `commands/ship-check.md` Phase 6 before the first merge. Mandatory every
    git grep <key-symbol-from-PR-diff> origin/main -- <relevant-file>
    ```
 
-**6.3 CI pending:** never merge on pending. If the wait is ≤3 min, poll `gh pr checks` every 60s, max 5 polls. If longer, dispatch ONE watcher subagent (`model: "sonnet"`): hard cap of 10×60s polls, incremental `.claude/agent-summary.md` writes after each merge, pre-baked content-proof commands, scope-fenced to in-scope PRs, return <200 words, never an "I'll wait" cliffhanger.
+**6.3 CI pending:** never merge on pending. If the wait is ≤3 min, poll `gh pr checks` every 60s, max 5 polls. If longer, dispatch ONE watcher subagent (`model: "haiku"`): hard cap of 10×60s polls, incremental `.claude/agent-summary.md` writes after each merge, pre-baked content-proof commands, scope-fenced to in-scope PRs, return <200 words, never an "I'll wait" cliffhanger.
 
 **6.4 Merge waves:** merge oldest branch first. After each merge, re-fetch main and re-run merge-tree for the next PR.
 
