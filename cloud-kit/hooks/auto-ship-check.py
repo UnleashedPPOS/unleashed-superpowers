@@ -134,7 +134,8 @@ def all_commits_docs_only(dirs, ts):
 
 
 def is_prose(path):
-    return path.lower().endswith((".md", ".mdx", ".txt"))
+    # .txt is excluded: requirements.txt, CMakeLists.txt and prompt files are behaviour.
+    return path.lower().endswith((".md", ".mdx"))
 
 
 def commits_docs_only(cwd, ts, pred=is_doc):
@@ -240,6 +241,9 @@ def main():
     if not changed and not shipped and delegated and docs_only is None:
         changed = committed_since(cwd, start.get("timestamp")) and commits_docs_only(cwd, start.get("timestamp")) is not True
         prose = prose and commits_docs_only(cwd, start.get("timestamp"), is_prose) is True
+    elif delegated and changed and prose and committed_since(cwd, start.get("timestamp")):
+        # a sub-agent may have committed code next to this turn's .md edits
+        prose = commits_docs_only(cwd, start.get("timestamp"), is_prose) is True
     if changed and prose:
         print(json.dumps({
             "decision": "block",
