@@ -18,11 +18,14 @@ blocks, but asks for the LIGHT check only: confirm on main, run the repo's sync/
 one-line report. Founder 2026-10-08: a full ship-check for a 2-line rules edit was waste.
 
 Knowledge repos (unleashed-memory, matched by origin URL or repo name, worktrees included) are
-docs repos: .md/.mdx/.txt/.pdf anywhere and any non-code file under raw/ count as docs, so a
-research note committed from a scratchpad worktree never blocks. Founder 2026-10-09. A commit is
-checked by the sha `git commit` printed (looked up in the touched repos and the knowledge repos),
-which survives `cd "$W"` paths and a worktree removed before the turn ends; when shas can't be
-matched one-to-one the time-window check below is the fallback. PDFs are docs in every repo.
+docs repos: .md/.mdx/.pdf under wiki/ or docs/, the root index/log/README.md and any non-code file
+under raw/ count as docs (the repo's bin/, supabase/ and prompts stay code), so a research note
+committed from a scratchpad worktree never blocks. Founder 2026-10-09. Such a commit is checked by
+the sha the command printed (`[branch sha]`, or `git log -1 --format=%h` after `commit -q`), looked
+up in the touched repos and the knowledge repos, so it survives `cd "$W"` paths and a worktree
+removed before the turn ends. Each sha must be new since the prompt, its subject must appear in the
+command, and the command must not loop or wrap git in another shell; otherwise the time-window
+check below is the fallback. PDFs are docs in every repo.
 
 Known gap: sub-agent edits that are neither committed in the session cwd's repo nor made by
 this transcript (e.g. uncommitted work in another worktree) are not seen.
@@ -40,14 +43,15 @@ NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks|\.claud
 # Repos that are a knowledge base, not software: notes and raw research sources are docs there.
 KNOWLEDGE_REPOS = {"unleashed-memory"}
 KNOWLEDGE_PATHS = [f"{HOME}/Developer/{n}" for n in KNOWLEDGE_REPOS]
-KNOWLEDGE_DOC = re.compile(r"\.(md|mdx|txt|pdf)$|^raw/", re.I)
-KNOWLEDGE_NOT_DOCS = re.compile(r"^(skills|rules|commands|agents|prompts|hooks|\.claude|\.github)/"
+KNOWLEDGE_DOC = re.compile(r"^(wiki|docs)/[^\0]*\.(md|mdx|pdf)$|^(index|log|README)\.md$|^raw/", re.I)
+KNOWLEDGE_NOT_DOCS = re.compile(r"(^|/)(skills|rules|commands|agents|prompts|hooks|\.claude|\.github)/"
                                 r"|(^|/)(SKILL|CLAUDE|AGENTS|GEMINI)\.md$", re.I)
 CODE_EXT = re.compile(r"\.(py|[cm]?[jt]sx?|sh|bash|zsh|rb|go|rs|swift|kt|java|sql|php|pl|lua|ya?ml|toml|ipynb)$", re.I)
 COMMIT_SHA = re.compile(r"^\[[^\]\n]*?\s([0-9a-f]{7,40})\]", re.M)  # `git commit` summary line
 BARE_SHA = re.compile(r"^([0-9a-f]{7,40})(?:[ \t].*)?$", re.M)  # `git log -1 --format='%h %s'`
 PRINTS_HEAD = re.compile(r"\bgit\s+(?:log\s+[^|;&\n]*(?:-1|-n\s*1)\b[^|;&\n]*%[hH]|rev-parse\s+(?:--short\S*\s+)?HEAD\b)")
 PERSISTED = re.compile(r"Full output saved to: (\S+)")
+LOOPS = re.compile(r"\b(?:for|while|until|xargs)\b|\bfind\b.*\s-exec")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 GIT_CHANGE = re.compile(r"\bgit\s+(?:-[Cc]\s+\S+\s+|--(?:git-dir|work-tree|namespace)\s+\S+\s+|--[\w-]+(?:=\S+)?\s+)*commit\b|\bgh\s+pr\s+create\b")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
@@ -147,6 +151,8 @@ def edit_is_doc(fp):
     """is_doc for an absolute file path, aware of knowledge repos."""
     if is_doc(fp):
         return True
+    if CODE_EXT.search(fp) or not re.search(r"\.(md|mdx|pdf)$|/raw/", fp, re.I):
+        return False  # can't be a knowledge-repo doc; skip the git lookups
     try:
         d = os.path.dirname(fp)
         while d and d != "/" and not os.path.isdir(d):
@@ -167,11 +173,13 @@ def result_text(entries, tool_id):
                 c = b.get("content")
                 text = c if isinstance(c, str) else "\n".join(
                     x.get("text", "") for x in c or [] if isinstance(x, dict))
-                m = PERSISTED.search(text)  # large output is moved to a file; read the whole thing
-                if m and m.group(1).startswith(f"{HOME}/.claude/projects/"):
+                m = PERSISTED.search(text)  # large output is moved to a file; read its last 2 MB
+                saved = os.path.realpath(m.group(1)) if m else ""
+                if saved.startswith(os.path.realpath(f"{HOME}/.claude/projects") + "/") and os.path.isfile(saved):
                     try:
-                        with open(m.group(1), errors="ignore") as f:
-                            text = f.read()
+                        with open(saved, "rb") as f:
+                            f.seek(max(0, os.path.getsize(saved) - 2_000_000))
+                            text = f.read().decode(errors="ignore")
                     except OSError:
                         pass
                 return text
@@ -181,9 +189,13 @@ def result_text(entries, tool_id):
 def commit_shas_docs_only(cmd, output, repos, ts):
     """True if the command's every git commit / gh pr create printed a commit sha (its `[branch sha]`
     line, or `git log -1 --format=%h` after `commit -q`), each sha exists in one of repos, was
-    committed after the prompt (ts), and touches only docs. False on any doubt."""
-    shas = COMMIT_SHA.findall(output) or (BARE_SHA.findall(output) if PRINTS_HEAD.search(cmd) else [])
-    if not shas or len(shas) != len(GIT_CHANGE.findall(cmd)):
+    committed after the prompt (ts), has its subject in the command, and touches only docs.
+    False on any doubt: loops, git run inside another shell, or a count mismatch."""
+    shell = QUOTED.sub("''", strip_heredocs(cmd))
+    if wrapped_git_change(cmd) or LOOPS.search(shell):
+        return False
+    shas = COMMIT_SHA.findall(output) or (BARE_SHA.findall(output) if PRINTS_HEAD.search(strip_heredocs(cmd)) else [])
+    if not shas or len(shas) != len(GIT_CHANGE.findall(shell)):
         return False
     try:
         since = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
@@ -194,8 +206,11 @@ def commit_shas_docs_only(cmd, output, repos, ts):
                     break
             else:
                 return False
-            if int(git(d, "show", "-s", "--format=%ct", full).stdout.strip() or 0) < since:
+            when, _, subject = git(d, "show", "-s", "--format=%ct %s", full).stdout.strip().partition(" ")
+            if int(when or 0) < since:
                 return False  # an older commit (e.g. the push failed and log showed origin's tip)
+            if len(subject) < 4 or subject not in cmd:
+                return False  # the printed sha isn't the commit this command made
             out = git(d, "diff-tree", "--root", "--no-commit-id", "-r", "-m", "--name-only", "--no-renames", "-z", full)
             files = [f for f in out.stdout.split("\0") if f.strip()]
             if out.returncode or not files or not all(is_doc(f, is_knowledge_repo(d)) for f in files):
@@ -320,7 +335,8 @@ def main():
                  for b in (e.get("message") or {}).get("content") or []
                  if isinstance(b, dict) and b.get("name") == "Bash"]
     # where a printed commit sha is looked up: touched repos first, then the knowledge repos
-    lookup_repos = sorted(repos_touched(cwd, bash_cmds, strict=False)) + KNOWLEDGE_PATHS
+    seen_repos = sorted(repos_touched(cwd, bash_cmds, strict=False))
+    lookup_repos = seen_repos + KNOWLEDGE_PATHS
     for e in tail:
         if e.get("type") != "assistant":
             continue
@@ -343,8 +359,9 @@ def main():
                     prose = prose and is_prose(fp)
             elif name == "Bash" and GIT_CHANGE.search(str(inp.get("command", ""))) and commit_shas_docs_only(
                     str(inp.get("command", "")), result_text(tail, b.get("id")), lookup_repos,
-                    start.get("timestamp") or ""):
-                continue
+                    start.get("timestamp") or "") and all(
+                    commits_docs_only(d, start.get("timestamp")) is not False for d in seen_repos):
+                continue  # and no code commit (an alias, a quiet one) landed in a repo this turn moved into
             elif name == "Bash" and wrapped_git_change(str(inp.get("command", ""))):
                 changed = True
                 prose = False

@@ -90,7 +90,7 @@ class HookTest(unittest.TestCase):
 
     def test_md_note_committed_from_removed_scratch_worktree_does_not_block(self):
         w = self.scratch_worktree(self.um)
-        out = commit(w, {"wiki/investigations/ai-influencers.md": "## new section\n"})
+        out = commit(w, {"wiki/investigations/ai-influencers.md": "## new section\n"}, "research: note")
         sh(self.um, "git", "worktree", "remove", "--force", w)  # removed before the turn ends
         cmd = f'W={w} && cd "$W" && git add -A && git commit -m "research: note" && git push -q origin HEAD:main'
         self.tool("Bash", {"command": cmd}, out)
@@ -98,7 +98,7 @@ class HookTest(unittest.TestCase):
 
     def test_quiet_commit_then_log_sha_from_persisted_output_does_not_block(self):
         w = self.scratch_worktree(self.um)
-        commit(w, {"wiki/investigations/x.md": "x\n"})
+        commit(w, {"wiki/investigations/x.md": "x\n"}, "research: note")
         sha = sh(w, "git", "log", "-1", "--format=%h %s").strip()
         sh(self.um, "git", "worktree", "remove", "--force", w)
         # big pre-commit output is moved to a file; the tool result only previews it
@@ -107,7 +107,7 @@ class HookTest(unittest.TestCase):
             os.makedirs(os.path.dirname(saved))
             with open(saved, "w") as f:
                 f.write("[pre-commit] OK\n" * 2000 + sha + "\n")
-            cmd = (f'W={w}; cd "$W" && git commit -q -m note >/dev/null; git push -q origin HEAD:main; '
+            cmd = (f'W={w}; cd "$W" && git commit -q -m "research: note" >/dev/null; git push -q origin HEAD:main; '
                    f"cd {self.um} && git worktree remove --force $W && git log origin/main -1 --format='%h %s'")
             self.tool("Bash", {"command": cmd}, f"<persisted-output>\nOutput too large. Full output saved to: {saved}\n")
             self.assertIsNone(self.run_hook())
@@ -124,8 +124,8 @@ class HookTest(unittest.TestCase):
         w = self.scratch_worktree(self.um)
         out = commit(w, {"raw/research/ai-influencers/terms.pdf": "%PDF-1.4",
                          "raw/research/ai-influencers/report.html": "<html></html>",
-                         "wiki/investigations/ai-influencers.md": "x\n", "log.md": "- note\n"})
-        self.tool("Bash", {"command": f"cd {w} && git commit -am note"}, out)
+                         "wiki/investigations/ai-influencers.md": "x\n", "log.md": "- note\n"}, "research: note")
+        self.tool("Bash", {"command": f'cd {w} && git commit -am "research: note"'}, out)
         self.assertIsNone(self.run_hook())
 
     def test_write_tool_md_edit_in_knowledge_main_checkout_does_not_block(self):
@@ -175,6 +175,55 @@ class HookTest(unittest.TestCase):
         out = commit(other, {"notes.md": "x\n"})
         self.tool("Bash", {"command": 'cd "$R" && git commit -am x'}, out)
         self.assertIsNotNone(self.run_hook())
+
+    # red-team regressions: a printed sha must belong to this command's own commit
+
+    def test_quiet_code_commit_then_docs_sha_from_other_repo_blocks(self):
+        commit(self.um, {"wiki/investigations/x.md": "x\n"}, "research: unrelated note")
+        commit(self.app, {"src/a.ts": "x\n"}, "feat")
+        sha = sh(self.um, "git", "log", "-1", "--format=%h").strip()
+        cmd = f"cd {self.app} && git commit -qam feat && cd {self.um} && git log -1 --format=%h"
+        self.tool("Bash", {"command": cmd}, sha)
+        self.assertIsNotNone(self.run_hook())
+
+    def test_wrapped_or_looped_quiet_commit_blocks(self):
+        out = commit(self.um, {"wiki/investigations/x.md": "x\n"}, "note")
+        sha = sh(self.um, "git", "log", "-1", "--format=%h").strip()
+        for cmd in (f"bash -c 'cd {self.app} && git commit -qam note'; cd {self.um}; git rev-parse --short HEAD",
+                    f"for r in {self.app} {self.um}; do (cd $r && git commit -qam note); done; git log -1 --format=%h"):
+            self.entries = self.entries[:1]
+            self.tool("Bash", {"command": cmd}, sha)
+            self.assertIsNotNone(self.run_hook(), cmd)
+
+    def test_alias_code_commit_next_to_docs_commit_blocks(self):
+        commit(self.app, {"src/a.ts": "x\n"}, "code")
+        out = commit(self.um, {"wiki/investigations/x.md": "x\n"}, "research: note")
+        cmd = f'cd {self.um} && git commit -m "research: note"; cd {self.app} && git ci -qam code'
+        self.tool("Bash", {"command": cmd}, out)
+        self.assertIsNotNone(self.run_hook())
+
+    def test_knowledge_repo_code_like_text_files_block(self):
+        for files in ({"bin/requirements.txt": "x\n"}, {"bin/archive/scan-allowlist.txt": "x\n"},
+                      {"voice-memo-ingest/prompts/summarise.md": "x\n"}):
+            self.entries = self.entries[:1]
+            w = self.scratch_worktree(self.um, "um-wt" + str(self.n))
+            out = commit(w, files, "tweak")
+            self.tool("Bash", {"command": f"cd {w} && git commit -am tweak"}, out)
+            self.assertIsNotNone(self.run_hook(), files)
+
+    def test_persisted_path_outside_projects_is_ignored(self):
+        w = self.scratch_worktree(self.um)
+        commit(w, {"wiki/investigations/x.md": "x\n"}, "research: note")
+        sha = sh(w, "git", "log", "-1", "--format=%h").strip()
+        outside = os.path.join(self.tmp, "outside.txt")
+        with open(outside, "w") as f:
+            f.write(sha + "\n")
+        with mock.patch.object(hook, "HOME", self.tmp):
+            os.makedirs(os.path.join(self.tmp, ".claude", "projects"))
+            sneaky = os.path.join(self.tmp, ".claude", "projects", "..", "..", "outside.txt")
+            cmd = f'W={w}; cd "$W" && git commit -q -m "research: note"; git log -1 --format=%h'
+            self.tool("Bash", {"command": cmd}, f"Full output saved to: {sneaky}\n")
+            self.assertIsNotNone(self.run_hook())
 
 
 if __name__ == "__main__":
