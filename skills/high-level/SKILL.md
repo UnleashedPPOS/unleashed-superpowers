@@ -34,6 +34,12 @@ A busy person reads only the end of what the agent says. Narration between tool 
 7. **No line cap.** Leaving out something important is worse than a long message.
 8. **Questions get answered directly.** Lead with the answer and give full detail when it is asked for. Ask at most one question per turn; otherwise take the sensible default and note it under Heads-up.
 
+## Status page, not chat (HARD RULE, 2026-10-10)
+
+- Each piece of work gets ONE HTML status page, published with the Artifact tool: Needs you first, then Done, Still open, Heads-up, Proof, Change log.
+- On any change, edit that page and republish to the SAME link. Put the link in the handoff file.
+- The chat reply is one or two lines: verdict, number of only-you steps, page link. Full rules: `output-styles/high-level.md`.
+
 ## Turning it off
 
 "stop high-level", "normal mode", or "explain more" switches back to the default style for the rest of the session.

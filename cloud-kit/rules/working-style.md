@@ -64,6 +64,11 @@ Founder: "I barely read anything you say… just tell me the high level things a
   next action. Update the file first so it matches this message. Founder 2026-10-01: the handoff kept
   getting updated but there was no starter to take it to another chat.
   One line per item in every field: the end state only, never how you got there.
+- **Status page, not chat (founder 2026-10-10: "zero output in the chat… make this HTML artifact instead").** Each piece of
+  work gets ONE HTML status page (Artifact tool): Needs you first, then Done, Still open, Heads-up, Proof, Change log. On any
+  change, edit and republish to the SAME link; put the link in the handoff file. The chat reply is 1-2 lines: verdict, number
+  of only-you steps, page link. Full text in chat only for STOP / not-shippable, one founder-only question, or a direct answer.
+  No Artifact tool (cloud routine, sub-agent) → write `status.html` next to the handoff file.
 - **Say each fact once (founder 2026-10-01: "why are you repeating yourself… that's wasting context").**
   A fact goes in exactly one section. Don't restate a Done item in Proof, Heads-up or Remaining, and don't repeat
   the same open item in both Remaining and Needs you. Leave out sections that would only repeat. Each new message reports
