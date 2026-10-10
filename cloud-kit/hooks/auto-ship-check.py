@@ -391,7 +391,7 @@ def main():
             "decision": "block",
             "reason": "[auto-ship-check] Code changed this turn and /ship-check has not run. "
                       "Run the ship-check skill now (it includes red-team), then end with the "
-                      "Done / Remaining / Heads-up / Proof / Needs you summary (short by default, no line cap; omit nothing important).",
+                      "work's HTML status page updated (Needs you / Done / Still open / Heads-up / Proof; omit nothing important) and a 1-2 line chat reply with its link.",
         }))
 
 
