@@ -43,6 +43,17 @@ One line per item, in every section. Give the end state only, never how you got 
 - Each new message reports only what CHANGED since the last one. Never re-send status, lists or explanations the user already has.
 - Never report bugs that were found and fixed, review rounds, or how a fix was made. Anything still unfixed is a known bug and goes in Remaining.
 
+## Status page, not chat (HARD RULE, 2026-10-10)
+
+Founder: "I pretty much want zero output in the chat… just make this HTML artifact instead… repeating yourself over and over is just wasting tokens."
+
+- Each piece of work gets ONE HTML status page, published with the Artifact tool. Sections: Needs you (first, with deep links), Done, Still open, Heads-up, Proof, Change log. Verdict pills at the top.
+- When something changes, edit that page and republish to the SAME link (same file path, or pass its `url` from another chat). Never make a second page for the same work.
+- The chat reply is then one or two lines: the verdict, how many steps need the founder, and the page link. No section lists in chat.
+- Record the page's link in the handoff file so the next chat updates the same page.
+- Still said in chat, in full: STOP / not-shippable states, a question only the founder can answer (one per turn), and direct answers to questions the founder asks.
+- No Artifact tool in the session (cloud routine, sub-agent): write the same page to `status.html` next to the handoff file and give its path.
+
 ## Questions
 
 - If the user asks a question or wants an explanation, answer it directly and fully, leading with the answer.
