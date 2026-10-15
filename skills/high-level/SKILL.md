@@ -1,6 +1,6 @@
 ---
 name: "high-level"
-description: "Use when the user says \"high-level mode\", \"/high-level\", \"just the high-level\", \"just tell me the high level things\", \"end state only\", \"stop narrating\", \"I barely read what you say\", or \"only tell me what I need to know\". Switches reporting to end-state only: no narration while working, then one final message in Done / Remaining / Heads-up / Proof / Needs you, with each fact said once. Stays on until the user says \"stop high-level\", \"normal mode\" or \"explain more\". SKIP when the user asks for a detailed explanation or walkthrough. That request is answered in full and the mode stays on afterwards."
+description: "Use when the user says \"high-level mode\", \"/high-level\", \"just the high-level\", \"just tell me the high level things\", \"end state only\", \"stop narrating\", \"I barely read what you say\", or \"only tell me what I need to know\". Switches reporting to end-state only: no narration while working, then the status (Done / Remaining / Heads-up / Proof / Needs you, each fact said once) goes on one HTML status page and chat gets 1-2 lines plus the link. Stays on until the user says \"stop high-level\", \"normal mode\" or \"explain more\". SKIP when the user asks for a detailed explanation or walkthrough. That request is answered in full and the mode stays on afterwards."
 ---
 
 # High-Level Mode
@@ -21,7 +21,7 @@ A busy person reads only the end of what the agent says. Narration between tool 
 
 1. **No narration while working.** Don't write "Let me…", "Now I'll…", commentary between tool calls, recaps of tool output, or option surveys.
 2. **No mid-task messages.** If one is forced, use at most 3 plain words ("Still working.").
-3. **One final message**, sections in this order, empty sections left out:
+3. **The status**, on the page (in chat only for a STOP / NOT SHIPPABLE, or with no page and no Artifact tool), sections in this order, empty sections left out:
    - **Done:** what shipped, with the PR link and whether it is merged or live.
    - **Remaining:** "No known bugs, nothing left" only if the work is shippable, merged and green after merge. Otherwise start with NOT SHIPPABLE, WITH CAVEATS, SHIPPABLE BUT NOT MERGED, or MERGED BUT POST-MERGE FAILED, then list every open item and why. Never drop an open item.
    - **Heads-up:** risks, cost changes, behaviour changes users will notice, decisions taken on the user's behalf.
@@ -30,7 +30,7 @@ A busy person reads only the end of what the agent says. Narration between tool 
    - **Continue in a new chat:** if a handoff file exists, a fenced paste-in starter with its absolute path and the next action.
 4. **One line per item. End state only.** Never explain how you got there, never list bugs found and fixed, never list review rounds.
 5. **Say each fact once.** A fact goes in exactly one section. Each new message reports only what changed since the last one.
-6. **Size the reply to what's new.** The full sections are for the first report on a piece of work. Later messages in the same chat (wake-ups, agent notifications, hook or `/ship-check` re-runs) give only the delta (a new task still gets a full report): nothing new is one line ("No change. 2 open items unchanged."), silence on a wake-up only when nothing is open; a small delta is plain lines without headers; earlier open items are not re-listed unless their state changed, just counted ("2 earlier open items unchanged."); Needs you, Proof and the starter are not re-sent unless they changed. A not-shippable state or a STOP always gets the full status. A quick question gets 1-3 lines.
+6. **Size the reply to what's new.** The full sections (on the status page when there is one) are for the first report on a piece of work. Later messages in the same chat (wake-ups, agent notifications, hook or `/ship-check` re-runs) give only the delta (a new task still gets a full report): nothing new is one line ("No change. 2 open items unchanged."), silence on a wake-up only when nothing is open; a small delta is plain lines without headers; earlier open items are not re-listed unless their state changed, just counted ("2 earlier open items unchanged."); Needs you, Proof and the starter are not re-sent unless they changed. A not-shippable state or a STOP always gets the full status. A quick question gets 1-3 lines.
 7. **No line cap.** Leaving out something important is worse than a long message.
 8. **Questions get answered directly.** Lead with the answer and give full detail when it is asked for. Ask at most one question per turn; otherwise take the sensible default and note it under Heads-up.
 
@@ -39,7 +39,10 @@ A busy person reads only the end of what the agent says. Narration between tool 
 - Each piece of work gets ONE HTML status page, published with the Artifact tool: Needs you first, then Done, Still open, Heads-up, Proof, Change log.
 - On any change, edit that page and republish to the SAME link. Put the link in the handoff file.
 - The chat reply is one or two lines: verdict, number of only-you steps, page link. Full rules: `output-styles/high-level.md`.
-- Never repeat the page in chat (side-session final messages included). Edit the page in small diffs, not full rewrites.
+- Never repeat the page in chat (side-session final messages included). Edit the page in small diffs, not full rewrites, but move finished items out of Still open.
+- Side-session final message: page link on line 1 (only 400 characters reach the parent); a STOP starts line 1 with "STOP:" and the link, then the full status.
+- Sub-agents never publish a page: they return the status and the parent updates its page. A cloud session with no Artifact tool puts the full status in the PR description and final message (a routine with no PR: a GitHub issue); a file in a cloud VM is unreachable.
+- The paste-in starter is still allowed in chat.
 
 ## Turning it off
 

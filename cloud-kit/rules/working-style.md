@@ -47,7 +47,7 @@ there and here in the same PR so they never drift.
 Founder: "I barely read anything you say… just tell me the high level things at the end."
 - While working: NO narration. No "Let me…/Now I'll…", no commentary between tool calls, no recaps of
   tool output, no option surveys. Just call the tools.
-- Final message only. Short by default, but **no line cap**: leaving out something important is worse than
+- Final message only (these sections go on the status page below; in chat only for STOP / NOT SHIPPABLE or with no page). Short by default, but **no line cap**: leaving out something important is worse than
   a longer message (founder 2026-10-01: "i dont want to miss out on anything important just because theres a rule").
   In this order:
   **Done:** what shipped (PR links, merged/live yes/no for each)
@@ -68,14 +68,16 @@ Founder: "I barely read anything you say… just tell me the high level things a
   work gets ONE HTML status page (Artifact tool): Needs you first, then Done, Still open, Heads-up, Proof, Change log. On any
   change, edit and republish to the SAME link; put the link in the handoff file. The chat reply is 1-2 lines: verdict, number
   of only-you steps, page link. Full text in chat only for STOP / NOT SHIPPABLE, one founder-only question, or a direct answer.
-  Never both: page content (incl. follow-ups, caveats) is never repeated in chat, side-session final messages included. Edit the page in small diffs.
-  No Artifact tool (cloud routine, sub-agent) → write `status.html` next to the handoff file.
+  Never both: page content (incl. follow-ups, caveats) is never repeated in chat, side-session final messages included. Edit the page in small diffs,
+  but move items (Still open → Done, drop finished Needs you), don't just append to the Change log. Side session: link on line 1; STOP → line 1 "STOP:" + link, then full.
+  Sub-agents never publish a page; they return status to the parent. No Artifact tool (cloud) → full status in the PR body
+  + final message (routine with no PR: a GitHub issue); a cloud-VM file is unreachable. `status.html` next to the handoff file only on the Mac. Starter stays in chat.
 - **Say each fact once (founder 2026-10-01: "why are you repeating yourself… that's wasting context").**
   A fact goes in exactly one section. Don't restate a Done item in Proof, Heads-up or Remaining, and don't repeat
   the same open item in both Remaining and Needs you. Leave out sections that would only repeat. Each new message reports
   only what CHANGED since the last one. Never re-send earlier status, lists or explanations the founder already has.
 - **Size the reply to what's new (founder 2026-10-02: "it starts to say all of these things over and over again").**
-  Full sections only for the FIRST report on a piece of work. Later messages in the same chat (wake-ups, agent
+  Full sections (on the page, if any) only for the FIRST report on a piece of work. Later messages in the same chat (wake-ups, agent
   notifications, Stop-hook / `/ship-check` re-runs) give only the delta (a new task = full report): nothing new = one line + open-item count, silence only if nothing is open; small
   delta = plain lines, no headers; earlier open items counted ("2 earlier open items unchanged."), not re-listed;
   Needs you / Proof not re-sent unless changed; starter re-sent only when the next action changed. Not-shippable / STOP = full status. Quick question = 1-3 lines.
