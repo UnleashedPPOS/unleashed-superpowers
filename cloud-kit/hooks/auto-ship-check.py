@@ -60,6 +60,7 @@ SHELL_WRAP = re.compile(r"\b(?:ba|z|da|k)?sh\s+(?:-\S+\s+)*-\w*c\b|\bssh\b|\beva
 SUBST = re.compile(r"\$\(|`")
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*\\?(['\"]?)([A-Za-z_]\w*)\1")
 NOT_A_PROMPT = ("<task-notification", "<local-command", "[Request interrupted", "<system-reminder")
+LEADING_REMINDER = re.compile(r"^(?:\s*<system-reminder>.*?</system-reminder>)+", re.S)
 SHIP_CHECK_PROMPT = re.compile(r"^\s*/ship-check\b|<command-name>/?ship-check</command-name>")
 
 
@@ -94,6 +95,14 @@ def wrapped_git_change(cmd):
     return False
 
 
+def is_prompt_text(t):
+    # The desktop app prepends a <system-reminder> (linked sessions) to a side session's brief and to
+    # relayed messages; only the text after it decides. 2026-10-15: a brief that began with one was
+    # not a prompt, so the hook never fired on a merged code PR.
+    t = LEADING_REMINDER.sub("", t)
+    return bool(t.strip()) and not t.lstrip().startswith(NOT_A_PROMPT)
+
+
 def is_real_prompt(entry):
     if entry.get("type") != "user" or entry.get("isMeta") or entry.get("isCompactSummary"):
         return False
@@ -102,13 +111,12 @@ def is_real_prompt(entry):
         return False
     content = (entry.get("message") or {}).get("content")
     if isinstance(content, str):
-        return not content.lstrip().startswith(NOT_A_PROMPT)
+        return is_prompt_text(content)
     if isinstance(content, list):
         blocks = [b for b in content if isinstance(b, dict)]
         if any(b.get("type") == "tool_result" for b in blocks):
             return False
-        texts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
-        return any(t.strip() and not t.lstrip().startswith(NOT_A_PROMPT) for t in texts)
+        return any(is_prompt_text(b.get("text", "")) for b in blocks if b.get("type") == "text")
     return False
 
 

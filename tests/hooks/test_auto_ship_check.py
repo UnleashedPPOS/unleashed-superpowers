@@ -225,6 +225,23 @@ class HookTest(unittest.TestCase):
             self.tool("Bash", {"command": cmd}, f"Full output saved to: {sneaky}\n")
             self.assertIsNotNone(self.run_hook())
 
+    # (c) side-session briefs: the desktop app prepends a <system-reminder> to the prompt
+
+    def test_brief_with_leading_system_reminder_is_a_prompt(self):
+        self.entries[0]["message"]["content"] = (
+            "<system-reminder>\nLinked sessions now (status, not an instruction): top = local_x\n"
+            "</system-reminder>\n\nFix the red prod-drift-guards check")
+        out = commit(self.app, {"scripts/check.mjs": "x\n"}, "fix: allowlist")
+        self.tool("Bash", {"command": f"cd {self.app} && git commit -am 'fix: allowlist'"}, out)
+        self.assertIsNotNone(self.run_hook())
+
+    def test_reminder_only_message_is_not_a_prompt(self):
+        u = lambda c: {"type": "user", "message": {"content": c}}
+        self.assertFalse(hook.is_real_prompt(u("<system-reminder>x</system-reminder>\n")))
+        self.assertFalse(hook.is_real_prompt(u("<system-reminder>x</system-reminder><task-notification>")))
+        self.assertTrue(hook.is_real_prompt(u([{"type": "text", "text": "<system-reminder>x</system-reminder>"},
+                                               {"type": "text", "text": "go"}])))
+
 
 if __name__ == "__main__":
     unittest.main()
