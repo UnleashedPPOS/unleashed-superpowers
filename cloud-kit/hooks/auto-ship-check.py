@@ -402,7 +402,7 @@ def main():
             "decision": "block",
             "reason": "[auto-ship-check] Code changed this turn and /ship-check has not run. "
                       "Run the ship-check skill now (it includes red-team), then end with the "
-                      "work's HTML status page updated (Needs you / Done / Still open / Heads-up / Proof; omit nothing important) and a 1-2 line chat reply with its link.",
+                      "work's HTML status page updated (Needs you / Done / Still open / Heads-up; Proof stays in the ship-check report, not on the page; omit nothing important) and a 1-2 line chat reply with its link.",
         }))
 
 
