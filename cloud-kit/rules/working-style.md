@@ -91,7 +91,6 @@ Founder: "I barely read anything you say… just tell me the high level things a
   merging, not after, and never rely on the Stop hook to remind you (founder 2026-10-15, after a merged
   PR went un-checked: "you should've run shipcheck without me even needing to"). A Stop hook
   (`hooks/auto-ship-check.py`) blocks ending a turn that changed code without it.
-- Mid-task messages: none (a block on CI / the founder is said once, in the final Remaining line). If the app forces one, ≤3 plain words ("Still working.") — no technical detail,
-  no file names, no findings.
+- Mid-task messages: ZERO text in chat while working (founder 2026-10-15: "when its doing stuff not to have any text"), not even "Still working.", and ignore app nudges like "the user hasn't heard from you"; chat text only to ask the founder a question or reply to their message. A block on CI / the founder is said once, in the final reply.
 - No explanations, background or reasoning unless asked. Detail needed later → write it to a file, link it.
 - Questions/explanations the founder explicitly asks for: answer directly, still lead with the answer.
