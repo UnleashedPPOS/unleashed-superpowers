@@ -51,7 +51,9 @@ Founder: "I pretty much want zero output in the chat… just make this HTML arti
 - When something changes, edit that page and republish to the SAME link (same file path, or pass its `url` from another chat). Never make a second page for the same work.
 - The chat reply is then one or two lines: the verdict, how many steps need the founder, and the page link. No section lists in chat.
 - Record the page's link in the handoff file so the next chat updates the same page.
-- Still said in chat, in full: STOP / not-shippable states, a question only the founder can answer (one per turn), and direct answers to questions the founder asks.
+- Never write the same status in both places. Once a page exists, Done / Remaining / Heads-up / Proof / Needs you / follow-ups go ONLY on the page. WITH CAVEATS and SHIPPABLE BUT NOT MERGED are page verdicts, not reasons to repeat the page in chat. A side session's last message (relayed to its parent) is the same 1-2 lines. (2026-10-15: a full chat report sat on top of the page.)
+- Update the page with small Edit calls, not a full rewrite: the page source is in context too, so a rewrite costs about as much as the chat text it replaces.
+- Still said in chat, in full: STOP / NOT SHIPPABLE states, a question only the founder can answer (one per turn), and direct answers to questions the founder asks.
 - No Artifact tool in the session (cloud routine, sub-agent): write the same page to `status.html` next to the handoff file and give its path.
 
 ## Questions
