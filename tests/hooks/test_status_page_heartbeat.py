@@ -175,6 +175,50 @@ class HeartbeatTest(unittest.TestCase):
     def test_bad_input_is_silent(self):
         self.assertIsNone(hook.main({"transcript_path": "/nope"}))
 
+    # --- hardening: bad env, bad state, huge transcripts, odd ids ---
+    def test_bad_interval_env_falls_back(self):
+        for raw, want in (("abc", 1800), ("nan", 1800), ("0", 60), ("-5", 60), ("inf", 1800), ("10", 600)):
+            with mock.patch.dict(os.environ, {"STATUS_HEARTBEAT_MIN": raw}):
+                self.assertEqual(hook.interval(), want, raw)
+
+    def test_wrong_typed_state_is_reset_not_fatal(self):
+        state_dir, base = hook.state_base({"session_id": "s1"})
+        for bad in ({"off": "x"}, {"off": -5}, {"work": "yes"}, {"url": 3}, [], {"off": True}):
+            with open(base + ".json", "w") as f:
+                json.dump(bad, f)
+            self.add(prompt(T0), tool(T0 + 60, "Edit", file_path=self.repo_file))
+            out = self.run_hook(T0 + 31 * 60)
+            self.assertIn("[status-page]", out["hookSpecificOutput"]["additionalContext"], bad)
+
+    def test_huge_transcript_without_state_reads_the_tail_only(self):
+        with mock.patch.object(hook, "MAX_READ", 4096):
+            self.add(*[tool(T0, "Read", file_path="/x") for _ in range(200)])
+            self.add(prompt(T0 + 1), tool(T0 + 60, "Edit", file_path=self.repo_file))
+            out = self.run_hook(T0 + 31 * 60)
+        self.assertIsNotNone(out)
+
+    def test_line_longer_than_read_window_does_not_stall(self):
+        with mock.patch.object(hook, "MAX_READ", 1024):
+            with open(self.path, "a") as f:
+                f.write("x" * 5000 + "\n")
+            for _ in range(8):
+                self.run_hook(T0)
+            self.add(prompt(T0 + 1), tool(T0 + 60, "Edit", file_path=self.repo_file))
+            out = self.run_hook(T0 + 31 * 60)
+        self.assertIsNotNone(out)
+
+    def test_odd_session_ids_stay_inside_state_dir(self):
+        for sid in ("../../evil", 12345, "", None, "/"):
+            state_dir, base = hook.state_base({"session_id": sid})
+            self.assertEqual(os.path.dirname(base), state_dir, sid)
+
+    def test_non_dict_tool_input_does_not_skip_later_blocks(self):
+        bad = {"type": "assistant", "timestamp": iso(T0 + 60), "message": {"content": [
+            {"type": "tool_use", "id": "a", "name": "Edit", "input": "oops"},
+            {"type": "tool_use", "id": "b", "name": "Edit", "input": {"file_path": self.repo_file}}]}}
+        self.add(prompt(T0), bad)
+        self.assertIsNotNone(self.run_hook(T0 + 31 * 60))
+
 
 if __name__ == "__main__":
     unittest.main()
