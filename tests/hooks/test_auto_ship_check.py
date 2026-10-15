@@ -246,6 +246,7 @@ class HookTest(unittest.TestCase):
         nested = "<system-reminder>a<system-reminder>b</system-reminder>c</system-reminder><task-notification>"
         self.assertFalse(hook.is_real_prompt(u(nested)))
         self.assertFalse(hook.is_real_prompt(u("<system-reminder>x\n<system-reminder>y")))
+        self.assertTrue(hook.is_real_prompt(u("why does the hook see </system-reminder> here? fix it")))
 
     def test_ship_check_after_leading_reminder_is_recognised(self):
         prompt = {"type": "user", "message": {"content": "<system-reminder>x</system-reminder>\n/ship-check"}}

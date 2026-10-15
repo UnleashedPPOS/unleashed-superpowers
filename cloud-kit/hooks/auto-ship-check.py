@@ -100,8 +100,10 @@ def is_prompt_text(t):
     # relayed messages; only the text after it decides. 2026-10-15: a brief that began with one was
     # not a prompt, so the hook never fired on a merged code PR.
     t = LEADING_REMINDER.sub("", t)
-    # A leftover closing tag means nested or quoted reminders the regex cut short: not a prompt.
-    return bool(t.strip()) and "</system-reminder>" not in t and not t.lstrip().startswith(NOT_A_PROMPT)
+    if not t.lstrip().startswith(NOT_A_PROMPT) and "</system-reminder>" in t:
+        # Nested or quoted reminders cut the strip short: judge only what follows the last closing tag.
+        t = t.rpartition("</system-reminder>")[2]
+    return bool(t.strip()) and not t.lstrip().startswith(NOT_A_PROMPT)
 
 
 def is_real_prompt(entry):
