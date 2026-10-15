@@ -18,10 +18,22 @@ happened after its last block, so it never loops. Sub-agent hook calls (payload 
 ignored: sub-agents never publish.
 Reads the transcript incrementally (offset cached in ~/.claude/state). Silent on any error.
 """
-import json, os, re, sys, tempfile, time
+import fcntl, json, math, os, re, sys, tempfile, time
 from datetime import datetime
 
-INTERVAL = float(os.environ.get("STATUS_HEARTBEAT_MIN", "30")) * 60
+
+
+def interval():
+    """STATUS_HEARTBEAT_MIN in seconds; bad, non-finite or <1 values fall back to 30 / 1 minute."""
+    try:
+        mins = float(os.environ.get("STATUS_HEARTBEAT_MIN", "30"))
+    except ValueError:
+        mins = 30.0
+    return max(1.0, mins if math.isfinite(mins) else 30.0) * 60
+
+
+INTERVAL = interval()
+MAX_READ = 8 << 20  # bytes of transcript scanned per call; a first run on a huge transcript starts near the end
 HOME = os.path.expanduser("~")
 SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
@@ -77,7 +89,9 @@ def scan(st, e):
         for c in content:
             if not isinstance(c, dict) or c.get("type") != "tool_use":
                 continue
-            name, inp = c.get("name"), c.get("input") or {}
+            name, inp = c.get("name"), c.get("input")
+            if not isinstance(inp, dict):
+                continue
             if name == "Artifact" and inp.get("action", "publish") == "publish" and not inp.get("asset"):
                 if not STATUS.search(os.path.basename(inp.get("file_path") or "")):
                     continue  # a report or other artifact, not the status page
@@ -94,23 +108,51 @@ def scan(st, e):
                 st["work"], st["wts"] = True, ts(e) or time.time()
 
 
-def load(payload):
-    path = payload.get("transcript_path") or ""
-    sid = os.path.basename(payload.get("session_id") or "x")
+def state_base(payload):
     state_dir = os.path.expanduser("~/.claude/state")
     os.makedirs(state_dir, exist_ok=True)
-    state_path = os.path.join(state_dir, f"status-heartbeat-{sid}.json")
+    sid = os.path.basename(str(payload.get("session_id") or "x")) or "x"
+    return state_dir, os.path.join(state_dir, f"status-heartbeat-{sid}")
+
+
+def valid(saved):
+    """Saved state must match FRESH's types (numbers >= 0); anything else would break the hook for good."""
+    if not isinstance(saved, dict):
+        return False
+    for k, v in FRESH.items():
+        x = saved.get(k, v)
+        if isinstance(v, bool) or isinstance(v, str):
+            if type(x) is not type(v):
+                return False
+        elif isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or x < 0:
+            return False
+    return True
+
+
+def load(payload):
+    path = payload.get("transcript_path") or ""
+    state_dir, base = state_base(payload)
+    state_path = base + ".json"
     st = dict(FRESH)
     try:
-        st.update(json.load(open(state_path)))
+        with open(state_path) as f:
+            saved = json.load(f)
+        if valid(saved):
+            st.update(saved)
     except Exception:
-        pass  # missing or torn state: rescan from the start
-    if os.path.getsize(path) < st["off"]:
+        pass  # missing, torn or wrong-typed state: rescan from the start
+    st["off"] = int(st["off"])
+    size = os.path.getsize(path)
+    if size < st["off"]:
         st = dict(FRESH)
+    if st["off"] == 0 and size > MAX_READ:
+        st["off"] = size - MAX_READ  # no state on a huge transcript: the first (partial) line is skipped
     with open(path, "rb") as f:
         f.seek(st["off"])
-        chunk = f.read()
+        chunk = f.read(MAX_READ)
     end = chunk.rfind(b"\n") + 1
+    if not end and len(chunk) == MAX_READ:
+        end = len(chunk)  # one line longer than MAX_READ: skip it rather than stall here forever
     for line in chunk[:end].splitlines():
         try:
             scan(st, json.loads(line))
@@ -148,6 +190,12 @@ def main(payload, now=None):
     if not os.path.exists(payload.get("transcript_path") or ""):
         return None
     now = now or time.time()
+    with open(state_base(payload)[1] + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)  # parallel tool calls fire PostToolUse together; last save must not win
+        return decide(payload, now)
+
+
+def decide(payload, now):
     st, state_dir, state_path = load(payload)
     out = None
     event = payload.get("hook_event_name") or "PostToolUse"
