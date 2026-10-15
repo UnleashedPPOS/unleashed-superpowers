@@ -88,6 +88,7 @@ To make it permanent, run **`/high-level-mode on`** once. That writes a flag fil
 | `/high-level-mode on\|off\|status` | Turns High-Level mode on or off for this and every future session (flag file + SessionStart hook). |
 | `/ai-native-reframe` | Mid-session audit. Takes the current AI-system design and produces structured output with five sections: ENGINE, PRESENTATION, BRIDGE, GAPS, 48-HOUR PROTOTYPE. |
 | `/document-feature-module <target>` | Thin wrapper that invokes the `document-feature-module` skill against a target module. |
+| `/learnings [notes]` | Harvests lessons from this chat (or pasted notes), checks what rules, memory and hooks already cover, and implements the rest. |
 
 `/red-team` and `/dod` stay available standalone for sessions that want just one stage — `scripts/check-command-sync.sh` fails the build if either command (or `/ship-check`) drifts out of sync with its source-of-truth skill.
 

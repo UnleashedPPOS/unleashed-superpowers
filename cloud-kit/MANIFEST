@@ -7,7 +7,9 @@ cloud-kit/hooks/context-size-nudge.py
 cloud-kit/hooks/status-page-heartbeat.py
 cloud-kit/rules/credential-handoffs.md
 cloud-kit/rules/git-workflow.md
+cloud-kit/rules/research-memory.md
 cloud-kit/rules/share-setup.md
+cloud-kit/rules/supabase.md
 cloud-kit/rules/token-discipline.md
 cloud-kit/rules/user-handoffs.md
 cloud-kit/rules/working-style.md
@@ -15,6 +17,7 @@ commands/ai-native-reframe.md
 commands/document-feature-module.md
 commands/dod.md
 commands/high-level-mode.md
+commands/learnings.md
 commands/red-team.md
 commands/ship-check.md
 output-styles/high-level.md
