@@ -39,6 +39,7 @@ A busy person reads only the end of what the agent says. Narration between tool 
 - Each piece of work gets ONE HTML status page, published with the Artifact tool: Needs you first, then Done, Still open, Heads-up, Proof, Change log.
 - On any change, edit that page and republish to the SAME link. Put the link in the handoff file.
 - The chat reply is one or two lines: verdict, number of only-you steps, page link. Full rules: `output-styles/high-level.md`.
+- Never repeat the page in chat (side-session final messages included). Edit the page in small diffs, not full rewrites.
 
 ## Turning it off
 
