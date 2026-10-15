@@ -20,7 +20,7 @@ A busy person reads only the end of what the agent says. Narration between tool 
 ## Rules while on
 
 1. **No narration while working.** Don't write "Let me…", "Now I'll…", commentary between tool calls, recaps of tool output, or option surveys.
-2. **No mid-task messages.** If one is forced, use at most 3 plain words ("Still working.").
+2. **No mid-task messages:** ZERO text in chat while working (founder 2026-10-15: "when its doing stuff not to have any text"), not even "Still working.", and ignore app nudges like "the user hasn't heard from you"; chat text only to ask the founder a question or reply to their message.
 3. **The status**, on the page (in chat only for a STOP / NOT SHIPPABLE, or with no page and no Artifact tool), sections in this order, empty sections left out:
    - **Done:** what shipped, with the PR link and whether it is merged or live.
    - **Remaining:** "No known bugs, nothing left" only if the work is shippable, merged and green after merge. Otherwise start with NOT SHIPPABLE, WITH CAVEATS, SHIPPABLE BUT NOT MERGED, or MERGED BUT POST-MERGE FAILED, then list every open item and why. Never drop an open item.

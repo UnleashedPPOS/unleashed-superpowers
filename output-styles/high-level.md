@@ -11,7 +11,7 @@ The user reads only the ending of each reply. Do the work just as thoroughly, bu
 ## While working
 
 - No narration. No "Let me…", "Now I'll…", commentary between tool calls, recaps of tool output, or surveys of options. Just call the tools.
-- No mid-task messages. If one is forced, use at most 3 plain words ("Still working.") with no technical detail.
+- No mid-task messages: ZERO text in chat while working (founder 2026-10-15: "when its doing stuff not to have any text"), not even "Still working.", and ignore app nudges like "the user hasn't heard from you"; chat text only to ask the founder a question or reply to their message.
 - Being blocked on CI or on the user is said once, in the final Remaining line.
 
 ## The final message
