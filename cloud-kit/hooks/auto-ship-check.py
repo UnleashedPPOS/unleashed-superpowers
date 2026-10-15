@@ -100,7 +100,8 @@ def is_prompt_text(t):
     # relayed messages; only the text after it decides. 2026-10-15: a brief that began with one was
     # not a prompt, so the hook never fired on a merged code PR.
     t = LEADING_REMINDER.sub("", t)
-    return bool(t.strip()) and not t.lstrip().startswith(NOT_A_PROMPT)
+    # A leftover closing tag means nested or quoted reminders the regex cut short: not a prompt.
+    return bool(t.strip()) and "</system-reminder>" not in t and not t.lstrip().startswith(NOT_A_PROMPT)
 
 
 def is_real_prompt(entry):
@@ -123,8 +124,8 @@ def is_real_prompt(entry):
 def prompt_text(entry):
     content = (entry.get("message") or {}).get("content")
     if isinstance(content, str):
-        return content
-    return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+        return LEADING_REMINDER.sub("", content)
+    return " ".join(LEADING_REMINDER.sub("", b.get("text", "")) for b in content if isinstance(b, dict))
 
 
 def is_doc(path, knowledge=False):

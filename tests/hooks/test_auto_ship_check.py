@@ -241,6 +241,15 @@ class HookTest(unittest.TestCase):
         self.assertFalse(hook.is_real_prompt(u("<system-reminder>x</system-reminder><task-notification>")))
         self.assertTrue(hook.is_real_prompt(u([{"type": "text", "text": "<system-reminder>x</system-reminder>"},
                                                {"type": "text", "text": "go"}])))
+        for tail in ("<local-command-stdout>x", "[Request interrupted by user]"):
+            self.assertFalse(hook.is_real_prompt(u("<system-reminder>x</system-reminder>" + tail)))
+        nested = "<system-reminder>a<system-reminder>b</system-reminder>c</system-reminder><task-notification>"
+        self.assertFalse(hook.is_real_prompt(u(nested)))
+        self.assertFalse(hook.is_real_prompt(u("<system-reminder>x\n<system-reminder>y")))
+
+    def test_ship_check_after_leading_reminder_is_recognised(self):
+        prompt = {"type": "user", "message": {"content": "<system-reminder>x</system-reminder>\n/ship-check"}}
+        self.assertTrue(hook.SHIP_CHECK_PROMPT.search(hook.prompt_text(prompt)))
 
 
 if __name__ == "__main__":
