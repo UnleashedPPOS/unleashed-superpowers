@@ -321,7 +321,7 @@ If multiple in-scope PRs are merging, merge in **squash-SHA chronological order 
 The founder reads only the ending. Two outputs:
 
 1. **Full report → file**, not chat: write it to `<repo>/.claude/ship-check-reports/<YYYY-MM-DD>-<branch>.md` (append `.claude/ship-check-reports/` to the file `git rev-parse --git-path info/exclude` prints — works in worktrees — so it is never committed). Format below.
-2. **Chat → the end state, short by default but no line cap.** Include everything important; leaving something out is worse than running long. Never list findings that were FIXED, fixes or review rounds in chat (anything still unfixed goes in Remaining):
+2. **Status page → the end state** (High-Level "Status page, not chat": create or update this work's one Artifact page; chat then gets 1-2 lines: verdict, number of only-you steps, page link). Run inside a sub-agent: return the status instead of publishing. The block below goes in chat in full only for a STOP / NOT SHIPPABLE, or when there is no Artifact tool (cloud: PR description too). Include everything important; leaving something out is worse than running long. Never list findings that were FIXED, fixes or review rounds in chat (anything still unfixed goes in Remaining):
    ```
    **Done:** <what shipped> · merged <PR link(s), or "not merged"> · live <yes/no + where>
    **Remaining:** No known bugs, nothing left — ONLY if SHIPPABLE, merged, and post-merge checks/deploy green; otherwise start with NOT SHIPPABLE / WITH CAVEATS / SHIPPABLE BUT NOT MERGED / MERGED BUT POST-MERGE FAILED, then every open item + why (never drop an open item)

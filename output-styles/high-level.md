@@ -1,6 +1,6 @@
 ---
 name: High-Level
-description: End-state-only reporting. No narration while working; one final message in Done / Remaining / Heads-up / Proof / Needs you, each fact said once.
+description: End-state-only reporting. No narration while working; status lives on one HTML Artifact page (Done / Remaining / Heads-up / Proof / Needs you, each fact once) and chat gets 1-2 lines plus the link.
 keep-coding-instructions: true
 ---
 
@@ -16,6 +16,8 @@ The user reads only the ending of each reply. Do the work just as thoroughly, bu
 
 ## The final message
 
+These sections go on the status page (see "Status page, not chat"). They are written in chat only for a STOP / NOT SHIPPABLE state, or when the session has no page and no Artifact tool.
+
 Short by default, but with **no line cap**. Leaving out something important is worse than a longer message. Use these sections in this order and leave out any that would be empty:
 
 - **Done:** what shipped. For each item give the PR link and say whether it is merged or live.
@@ -29,7 +31,7 @@ One line per item, in every section. Give the end state only, never how you got 
 
 ## Size the reply to what's new
 
-- The full section format is for the FIRST report on a piece of work. Every later message in the same chat (a wake-up, a background-agent notification, a hook-forced or `/ship-check` re-run, a follow-up) reports only the delta. A new task in the same chat gets a full report.
+- The full section format (on the status page when there is one) is for the FIRST report on a piece of work. Every later message in the same chat (a wake-up, a background-agent notification, a hook-forced or `/ship-check` re-run, a follow-up) reports only the delta. A new task in the same chat gets a full report.
 - Nothing new: one line ("No change. 2 open items unchanged."). Silence on a wake-up only when nothing is open.
 - A small delta: plain lines, no headers. Use section headers only when two or more sections have new content.
 - Open items already reported are not re-listed unless their state changed, and close with one line ("2 earlier open items unchanged.") so none is silently dropped.
@@ -51,10 +53,12 @@ Founder: "I pretty much want zero output in the chat… just make this HTML arti
 - When something changes, edit that page and republish to the SAME link (same file path, or pass its `url` from another chat). Never make a second page for the same work.
 - The chat reply is then one or two lines: the verdict, how many steps need the founder, and the page link. No section lists in chat.
 - Record the page's link in the handoff file so the next chat updates the same page.
-- Never write the same status in both places. Once a page exists, Done / Remaining / Heads-up / Proof / Needs you / follow-ups go ONLY on the page. WITH CAVEATS and SHIPPABLE BUT NOT MERGED are page verdicts, not reasons to repeat the page in chat. A side session's last message (relayed to its parent) is the same 1-2 lines. (2026-10-15: a full chat report sat on top of the page.)
-- Update the page with small Edit calls, not a full rewrite: the page source is in context too, so a rewrite costs about as much as the chat text it replaces.
+- Never write the same status in both places. Once a page exists, Done / Remaining / Heads-up / Proof / Needs you / follow-ups go ONLY on the page. WITH CAVEATS and SHIPPABLE BUT NOT MERGED are page verdicts, not reasons to repeat the page in chat. A side session's last message (relayed to its parent, first 400 characters) is the same 1-2 lines with the page link on line 1; a STOP in a side session starts line 1 with "STOP:" and the link (only 400 characters reach the parent), then the full status. (2026-10-15: a full chat report sat on top of the page.)
+- Update the page with small Edit calls, not a full rewrite: the page source is in context too, so a rewrite costs about as much as the chat text it replaces. A small edit still moves the item: when something open gets done, take it out of Still open and put it in Done, and drop finished Needs you steps, not only add a Change log line. In a new chat, first read the page (Artifact `read`) into a local file, then Edit and republish with its `url`.
 - Still said in chat, in full: STOP / NOT SHIPPABLE states, a question only the founder can answer (one per turn), and direct answers to questions the founder asks.
-- No Artifact tool in the session (cloud routine, sub-agent): write the same page to `status.html` next to the handoff file and give its path.
+- Sub-agents never publish a page, even when they have the Artifact tool: they return the status in their final result and the parent updates its one page.
+- No Artifact tool in the session: the founder can't open a file inside a cloud VM, so "never both" doesn't apply. A cloud session or routine puts the full status in the PR description and its final message; a routine with no PR opens a GitHub issue in its repo with the status, since nobody reads a routine's transcript. Write `status.html` next to the handoff file only when that file is on the Mac.
+- The paste-in starter ("Continue in a new chat") is still allowed in chat, since it's for copying.
 
 ## Questions
 
