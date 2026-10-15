@@ -65,7 +65,9 @@ Founder: "I barely read anything you say… just tell me the high level things a
   getting updated but there was no starter to take it to another chat.
   One line per item in every field: the end state only, never how you got there.
 - **Status page, not chat (founder 2026-10-10: "zero output in the chat… make this HTML artifact instead").** Each piece of
-  work gets ONE HTML status page (Artifact tool): Needs you first, then Done, Still open, Heads-up, Proof, Change log. On any
+  work gets ONE HTML status page (Artifact tool): verdict line, Needs you, Done, Still open, Heads-up; plain styling.
+  Done = one plain line per item (what's live + PR link), no internals; Proof/change log stay off the page (report/handoff/PR body,
+  founder 2026-10-15: "i dont actually really need to see that"). Republish only on founder-visible changes. On any
   change, edit and republish to the SAME link; put the link in the handoff file. The chat reply is 1-2 lines: verdict, number
   of only-you steps, page link. Full text in chat only for STOP / NOT SHIPPABLE, one founder-only question, or a direct answer.
   Never both: page content (incl. follow-ups, caveats) is never repeated in chat, side-session final messages included. Edit the page in small diffs,

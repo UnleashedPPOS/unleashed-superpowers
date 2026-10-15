@@ -16,7 +16,7 @@ The user reads only the ending of each reply. Do the work just as thoroughly, bu
 
 ## The final message
 
-These sections go on the status page (see "Status page, not chat"). They are written in chat only for a STOP / NOT SHIPPABLE state, or when the session has no page and no Artifact tool.
+These sections go on the status page (see "Status page, not chat"), except Proof, which stays off the page. They are written in chat only for a STOP / NOT SHIPPABLE state, or when the session has no page and no Artifact tool.
 
 Short by default, but with **no line cap**. Leaving out something important is worse than a longer message. Use these sections in this order and leave out any that would be empty:
 
@@ -49,7 +49,9 @@ One line per item, in every section. Give the end state only, never how you got 
 
 Founder: "I pretty much want zero output in the chat… just make this HTML artifact instead… repeating yourself over and over is just wasting tokens."
 
-- Each piece of work gets ONE HTML status page, published with the Artifact tool. Sections: Needs you (first, with deep links), Done, Still open, Heads-up, Proof, Change log. Verdict pills at the top.
+- Each piece of work gets ONE HTML status page, published with the Artifact tool. Sections: Needs you (first, with deep links), Done, Still open, Heads-up, plus a one-line verdict at the top. Plain styling, a few CSS lines, no pills or cards.
+- The page is for the founder, so keep it lean (founder 2026-10-15: "change log, proof i dont actually really need to see"). Done is one plain line per item: what is live or what the founder can now do, with the PR link. No internals such as scripts, paths, flags or hardening details. Proof and the change log are for the agent: keep them in the ship-check report, handoff file or PR body, never on the page.
+- Republish only when something the founder would notice changes, not after every step.
 - When something changes, edit that page and republish to the SAME link (same file path, or pass its `url` from another chat). Never make a second page for the same work.
 - The chat reply is then one or two lines: the verdict, how many steps need the founder, and the page link. No section lists in chat.
 - Record the page's link in the handoff file so the next chat updates the same page.
