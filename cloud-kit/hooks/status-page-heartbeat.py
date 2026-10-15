@@ -10,9 +10,12 @@ Stop: if real work happened after the page was last published this turn (edits o
 dirs, commits, PRs, merges, spawned agents/sessions), block the stop ONCE and ask for the final
 page update. Ship-check ordering is left to auto-ship-check.py, which fires on the same Stop.
 
-Which page: the one this session published (URL from the Artifact result), else a claude.ai
-artifact link seen in a prompt or brief (a side session started from a chat updates its parent's
-page). Sub-agent hook calls (payload has agent_id) are ignored: sub-agents never publish.
+Which page: a status page this session published (an Artifact publish whose file name contains
+"status"; other artifacts such as reports don't count), else a claude.ai artifact link given in a
+prompt that mentions "status" (a side session started from a chat updates its parent's page).
+Task notifications and side-session events don't start a new turn. Stop re-blocks only when new work
+happened after its last block, so it never loops. Sub-agent hook calls (payload has agent_id) are
+ignored: sub-agents never publish.
 Reads the transcript incrementally (offset cached in ~/.claude/state). Silent on any error.
 """
 import json, os, re, sys, tempfile, time
@@ -25,9 +28,11 @@ EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 SPAWN_TOOLS = {"Agent", "Task", "mcp__ccd_session__start_session", "mcp__ccd_session__hand_off_to_session"}
 GIT_WORK = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?commit\b|\bgh\s+pr\s+(?:create|merge)\b")
 PUBLISHED = re.compile(r"Published \S.* at (https://claude\.ai/(?:code/)?artifact/[\w-]+)")
+STATUS = re.compile(r"status", re.I)
 ARTIFACT_URL = re.compile(r"https://claude\.ai/(?:code/)?artifact/[\w-]+")
-NOT_A_PROMPT = ("<local-command", "[Request interrupted")
-FRESH = {"off": 0, "turn": 0, "pub": 0, "nudge": 0, "url": "", "brief": "", "work": False, "fired": 0}
+NOT_A_PROMPT = ("<local-command", "[Request interrupted", "<task-notification", "<side-sessions-event",
+                "<ci-monitor-event")
+FRESH = {"off": 0, "turn": 0, "pub": 0, "nudge": 0, "url": "", "brief": "", "work": False, "wts": 0, "fired": 0, "pending": ""}
 
 
 def ts(e):
@@ -57,15 +62,16 @@ def scan(st, e):
             isinstance(c, dict) and c.get("type") == "tool_result" for c in content)
         body = text_of(content)
         if results:
+            ids = {c.get("tool_use_id") for c in content if isinstance(c, dict)}
             m = PUBLISHED.search(body)
-            if m:
-                st["url"] = m.group(1)
+            if m and st["pending"] in ids:
+                st["url"], st["pending"] = m.group(1), ""
             return
         if e.get("isMeta") or e.get("isCompactSummary") or body.lstrip().startswith(NOT_A_PROMPT):
             return
         st["turn"], st["work"] = ts(e) or st["turn"], False
         urls = ARTIFACT_URL.findall(body)
-        if urls:
+        if urls and STATUS.search(body):
             st["brief"] = urls[-1]
     elif kind == "assistant" and isinstance(content, list):
         for c in content:
@@ -73,13 +79,19 @@ def scan(st, e):
                 continue
             name, inp = c.get("name"), c.get("input") or {}
             if name == "Artifact" and inp.get("action", "publish") == "publish" and not inp.get("asset"):
+                if not STATUS.search(os.path.basename(inp.get("file_path") or "")):
+                    continue  # a report or other artifact, not the status page
                 st["pub"], st["work"] = ts(e) or time.time(), False
+                if inp.get("url"):
+                    st["url"] = inp["url"]
+                else:
+                    st["pending"] = c.get("id") or ""
             elif name in EDIT_TOOLS:
                 p = os.path.realpath(inp.get("file_path") or inp.get("notebook_path") or "/tmp/x")
                 if not p.startswith(SKIP_PREFIXES):
-                    st["work"] = True
+                    st["work"], st["wts"] = True, ts(e) or time.time()
             elif name in SPAWN_TOOLS or (name == "Bash" and GIT_WORK.search(inp.get("command") or "")):
-                st["work"] = True
+                st["work"], st["wts"] = True, ts(e) or time.time()
 
 
 def load(payload):
@@ -125,7 +137,8 @@ def where(st):
     if st["brief"]:
         return (f"This chat reports to the page {st['brief']} (from its brief or prompt): read it, update "
                 "only this work's lines, and republish to that url; on a conflict, merge onto the live version.")
-    return "No status page yet: publish one now (Artifact) and reuse its link from then on."
+    return ("No status page yet: publish one now (Artifact, a file named *status*.html) and reuse its link "
+            "from then on.")
 
 
 def main(payload, now=None):
@@ -141,14 +154,15 @@ def main(payload, now=None):
     if event == "Stop":
         has_page = st["url"] or st["brief"]
         long_turn = st["turn"] and now - st["turn"] >= INTERVAL
-        if st["work"] and st["fired"] != st["turn"] and (has_page or long_turn):
-            st["fired"] = st["turn"]
+        if st["work"] and st["fired"] < st["wts"] and (has_page or long_turn):
+            st["fired"] = st["wts"]
             out = {"decision": "block", "reason": (
                 "[status-page] Work happened after the status page was last updated. Before ending: ship-check "
                 "first if code changed, then update the page (finished items into Done, drop finished Needs you "
-                f"steps, what is still running under Still open). {where(st)} Then a 1-2 line reply. Skip the "
-                "republish only if nothing the founder would notice changed.")}
-    elif st["turn"]:
+                f"steps, what is still running under Still open). {where(st)} No Artifact tool (cloud): put it in the "
+                "PR description instead. Then a 1-2 line reply. Skip the republish only if nothing the founder "
+                "would notice changed.")}
+    elif st["turn"] and st["work"]:
         last = max(st["turn"], st["pub"], st["nudge"])
         if now - last >= INTERVAL:
             mins = int((now - max(st["turn"], st["pub"])) // 60)

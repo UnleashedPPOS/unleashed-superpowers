@@ -24,18 +24,18 @@ def prompt(t, text="do the thing"):
     return {"type": "user", "timestamp": iso(t), "message": {"role": "user", "content": text}}
 
 
-def tool(t, name, **inp):
+def tool(t, name, tid="x", **inp):
     return {"type": "assistant", "timestamp": iso(t),
-            "message": {"content": [{"type": "tool_use", "id": "x", "name": name, "input": inp}]}}
+            "message": {"content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}}
 
 
-def result(t, text):
+def result(t, text, tid="x"):
     return {"type": "user", "timestamp": iso(t),
-            "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": text}]}}
+            "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": text}]}}
 
 
-def published(t, url=URL):
-    return [tool(t, "Artifact", file_path="/tmp/p.html"), result(t, f"Published /tmp/p.html at {url} (Version 1)")]
+def published(t, url=URL, path="/tmp/work-status.html"):
+    return [tool(t, "Artifact", tid="pub", file_path=path), result(t, f"Published {path} at {url} (Version 1)", "pub")]
 
 
 class HeartbeatTest(unittest.TestCase):
@@ -76,18 +76,18 @@ class HeartbeatTest(unittest.TestCase):
         self.assertIsNone(self.run_hook(T0 + 40 * 60))
 
     def test_no_page_yet_asks_to_publish_one(self):
-        self.add(prompt(T0))
+        self.add(prompt(T0), tool(T0 + 10, "Edit", file_path=self.repo_file))
         msg = self.run_hook(T0 + 31 * 60)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("No status page yet", msg)
 
     def test_side_session_uses_parent_page_from_brief(self):
-        self.add(prompt(T0, f"Fix the feed. Status page: {PARENT}"))
+        self.add(prompt(T0, f"Fix the feed. Status page: {PARENT}"), tool(T0 + 10, "Agent", prompt="x"))
         msg = self.run_hook(T0 + 31 * 60)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(PARENT, msg)
         self.assertIn("only this work's lines", msg)
 
     def test_own_page_beats_brief_link(self):
-        self.add(prompt(T0, f"see {PARENT}"), published(T0 + 60))
+        self.add(prompt(T0, f"status: {PARENT}"), published(T0 + 60), tool(T0 + 70, "Edit", file_path=self.repo_file))
         msg = self.run_hook(T0 + 40 * 60)["hookSpecificOutput"]["additionalContext"]
         self.assertIn(URL, msg)
         self.assertNotIn(PARENT, msg)
@@ -131,9 +131,46 @@ class HeartbeatTest(unittest.TestCase):
         self.add(prompt(T0), published(T0 + 10))
         self.run_hook(T0 + 20)
         open(self.path, "w").close()  # transcript rewritten
-        self.add(prompt(T0 + 1000))
+        self.add(prompt(T0 + 1000), tool(T0 + 1010, "Edit", file_path=self.repo_file))
         self.assertIn("No status page yet",
                       self.run_hook(T0 + 1000 + 31 * 60)["hookSpecificOutput"]["additionalContext"])
+
+    def test_report_artifact_is_not_the_status_page(self):
+        self.add(prompt(T0), published(T0 + 10, url=PARENT, path="/tmp/report.html"),
+                 tool(T0 + 20, "Edit", file_path=self.repo_file))
+        msg = self.run_hook(T0 + 31 * 60)["hookSpecificOutput"]["additionalContext"]
+        self.assertNotIn(PARENT, msg)
+        self.assertIn("No status page yet", msg)
+
+    def test_unrelated_link_in_prompt_is_not_the_page(self):
+        self.add(prompt(T0, f"look at this design {PARENT}"), tool(T0 + 10, "Edit", file_path=self.repo_file))
+        self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
+
+    def test_published_text_in_other_tool_output_ignored(self):
+        self.add(prompt(T0), tool(T0 + 10, "Bash", tid="b", command="cat log"),
+                 result(T0 + 11, f"Published x at {PARENT}", "b"), tool(T0 + 20, "Edit", file_path=self.repo_file))
+        self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
+
+    def test_task_notification_does_not_rearm_stop(self):
+        self.add(prompt(T0), published(T0 + 10), tool(T0 + 20, "Bash", command="git commit -m x"))
+        self.assertIsNotNone(self.run_hook(T0 + 30, event="Stop"))
+        self.add(prompt(T0 + 100, "<task-notification>agent done</task-notification>"))
+        self.assertIsNone(self.run_hook(T0 + 130, event="Stop"))
+
+    def test_work_after_block_reblocks_once(self):
+        self.add(prompt(T0), published(T0 + 10), tool(T0 + 20, "Edit", file_path=self.repo_file))
+        self.assertIsNotNone(self.run_hook(T0 + 30, event="Stop"))
+        self.add(tool(T0 + 40, "Bash", command="gh pr merge 1 --squash"))
+        self.assertIsNotNone(self.run_hook(T0 + 50, event="Stop", stop_hook_active=True))
+        self.assertIsNone(self.run_hook(T0 + 60, event="Stop", stop_hook_active=True))
+
+    def test_read_only_long_turn_no_nudge(self):
+        self.add(prompt(T0), tool(T0 + 10, "Bash", command="ls"))
+        self.assertIsNone(self.run_hook(T0 + 90 * 60))
+
+    def test_cloud_fallback_in_stop_reason(self):
+        self.add(prompt(T0), tool(T0 + 60, "Agent", prompt="build it"))
+        self.assertIn("PR description", self.run_hook(T0 + 45 * 60, event="Stop")["reason"])
 
     def test_bad_input_is_silent(self):
         self.assertIsNone(hook.main({"transcript_path": "/nope"}))
