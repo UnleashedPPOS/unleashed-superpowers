@@ -42,6 +42,7 @@ A busy person reads only the end of what the agent says. Narration between tool 
 - The chat reply is one or two lines: verdict, number of only-you steps, page link. Full rules: `output-styles/high-level.md`.
 - Never repeat the page in chat (side-session final messages included). Edit the page in small diffs, not full rewrites, but move finished items out of Still open.
 - Side-session final message: page link on line 1 (only 400 characters reach the parent); a STOP starts line 1 with "STOP:" and the link, then the full status.
+- Long work keeps the page live (founder 2026-10-15: "the status updates every so often… work spawned off from a chat gets the global update"). Republish the page about every 30 min of work, with what is in flight under Still open; the status-page-heartbeat hook nudges (name the page file *status*.html so it finds it). Work spawned from a chat feeds that chat's ONE page: put the page link in every side-session brief; the side session updates only its own lines on that page (on a conflict, merge onto the live version); when a side session or sub-agent reports back, the parent moves its items on the page. Finishing order: ship-check if code changed, then the final page update, then the 1-2 line reply.
 - Sub-agents never publish a page: they return the status and the parent updates its page. A cloud session with no Artifact tool puts the full status in the PR description and final message (a routine with no PR: a GitHub issue); a file in a cloud VM is unreachable.
 - The paste-in starter is still allowed in chat.
 

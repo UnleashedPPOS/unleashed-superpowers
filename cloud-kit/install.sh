@@ -90,6 +90,8 @@ def ensure(event, key, command, **extra):
 
 ensure("Stop", "/.claude/hooks/auto-ship-check.py", f'"{cl}/hooks/auto-ship-check.py"', timeout=10)
 ensure("PostToolUse", "/.claude/hooks/context-size-nudge.py", f'"{cl}/hooks/context-size-nudge.py"', timeout=10)
+ensure("PostToolUse", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
+ensure("Stop", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
 ensure("SessionStart", "/cloud-kit/install.sh | bash", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
        timeout=600, **{"async": True})
 fd, tmp = tempfile.mkstemp(dir=cl, prefix=".settings.")
