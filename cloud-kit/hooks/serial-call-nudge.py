@@ -4,7 +4,8 @@
 Every tool call re-reads the whole context, so N serial one-call messages cost ~N full
 context reads. Independent reads/greps/commands belong in ONE message (parallel calls) or
 one ctx_batch_execute. Counts consecutive assistant messages since the last real user
-prompt that carry exactly one tool_use; fires at LIMIT, then every LIMIT more.
+prompt that carry exactly one tool_use (a parallel batch, edit or agent call ends the streak);
+fires at LIMIT, then every LIMIT more.
 Reads only the transcript tail. Silent on any error.
 """
 import json, os, sys, tempfile
@@ -27,13 +28,16 @@ try:
         lines = f.read().split(b"\n")
     if size > TAIL:
         lines = lines[1:]  # first line is probably cut mid-record
-    run = 0
+    # one API response is split over several transcript entries sharing message.id, so group by id
+    msgs = {}  # newest first (insertion order while walking backwards)
     for raw in reversed(lines):
         if not raw.strip():
             continue
         try:
             e = json.loads(raw)
         except Exception:
+            continue
+        if e.get("isSidechain") or e.get("isCompactSummary"):
             continue
         msg = e.get("message") or {}
         content = msg.get("content")
@@ -45,36 +49,40 @@ try:
             break  # a real user prompt ends the turn
         if e.get("type") != "assistant" or not isinstance(content, list):
             continue
-        uses = [c for c in content if isinstance(c, dict) and c.get("type") == "tool_use"]
-        if not uses:
-            continue
-        if len(uses) == 1:
-            n = uses[0].get("name", "")
-            if n in BATCHABLE or n.startswith(BATCHABLE_PREFIX):
-                run += 1
-            continue
-        # a parallel batch is the behaviour we want; it does not extend the run
-    state_dir = os.path.expanduser("~/.claude/state")
-    os.makedirs(state_dir, exist_ok=True)
-    sp = os.path.join(state_dir, f"serial-nudge-{sid}.json")
-    warned = 0
+        mid = msg.get("id") or e.get("uuid")
+        names = msgs.setdefault(mid, [])
+        names += [c.get("name", "") for c in content if isinstance(c, dict) and c.get("type") == "tool_use"]
+    sid_state = os.path.expanduser("~/.claude/state")
+    sp = os.path.join(sid_state, f"serial-nudge-{sid}.json")
     try:
-        warned = int(json.load(open(sp)).get("warned", 0))
+        fired = json.load(open(sp)).get("fired")
     except Exception:
-        pass
-    if run < warned:
-        warned = 0  # new turn
-    fire = run >= LIMIT and run >= warned + LIMIT if warned else run >= LIMIT
+        fired = None
+    # trailing streak of single batchable calls; a parallel batch, an edit, an agent or plain text ends it
+    run = since = 0
+    seen_fired = False
+    for mid, names in msgs.items():
+        if not names:
+            continue  # text/thinking-only entry; not a call
+        if len(names) != 1 or not (names[0] in BATCHABLE or names[0].startswith(BATCHABLE_PREFIX)):
+            break
+        run += 1
+        if mid == fired:
+            seen_fired = True
+        if not seen_fired:
+            since += 1
+    fire = run >= LIMIT and since >= LIMIT
     if fire:
-        warned = run
-    fd, tmp = tempfile.mkstemp(dir=state_dir)
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump({"warned": warned}, f)
-        os.replace(tmp, sp)
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        os.makedirs(sid_state, exist_ok=True)
+        newest = next(iter(msgs))
+        fd, tmp = tempfile.mkstemp(dir=sid_state)
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump({"fired": newest}, f)
+            os.replace(tmp, sp)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
     if not fire:
         sys.exit(0)
     msg = (f"[token] {run} single-tool calls in a row this turn; each re-reads the full context. "
