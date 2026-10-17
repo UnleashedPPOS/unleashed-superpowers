@@ -201,7 +201,7 @@ Trust nothing. Prove it.
 - **Edge functions touched** — `mcp__supabase__get_logs(service='edge-function')` filtered by function name in the last hour. Confirm a 200 from your deploy. If zero invocations yet: "deployed but not smoked — manual hit before declaring done."
 - **Sentry** — `mcp__69d67893-09e0-414d-9e82-7bb4e7df8ce4__search_issues` with `component:<function-name>` or browser filters touching new files. Any unresolved error introduced by this session = **blocker**.
 - **Preview server** — if a UI page was touched: `mcp__Claude_Preview__preview_start`, take one screenshot of the primary surface, grab `preview_console_logs` and `preview_network` for the last minute. Zero unexpected console errors is the bar.
-- **Playwright e2e** — if the session shipped a user-facing flow: invoke `everything-claude-code:e2e` to generate / run the journey, or via `mcp__playwright__browser_*` for ad-hoc verification. If e2e already exists, run it.
+- **Playwright e2e** — if the session shipped a user-facing flow: invoke `everything-claude-code:e2e` to generate / run the journey, or via `playwright-cli` (Bash) / the built-in browser for ad-hoc verification. If e2e already exists, run it.
 
 ## Phase 4 — Capture Lessons (mandatory if any user correction landed)
 

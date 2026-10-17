@@ -48,4 +48,4 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 
 ## Keep context lean
 - No whole-file Reads of large files (ranges/grep); filter big output (head/jq/ctx_execute) and print only the answer; never re-read a file already in context.
-- Don't load connectors/plugins you don't need (Vercel, Everygen, Higgsfield, playwright off by default; use vercel/gh/supabase CLIs). Keep MEMORY.md + rules short; detail goes in memory files.
+- Don't load connectors/plugins you don't need (Vercel, Everygen, Higgsfield, playwright MCP, sequential-thinking are removed; use CLIs: vercel/gh/supabase/`apify`/`playwright-cli`/`ctx7`). Keep MEMORY.md + rules short; detail goes in memory files.
