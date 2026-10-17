@@ -5,7 +5,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 ## Tool-call loops (biggest lever; each serial call re-reads the full context)
 - Batch: independent reads/greps/commands go in ONE message (parallel tool calls) or one `ctx_batch_execute` / one script.
 - Read a file region once, in a generous chunk (or `tilth_read` with `sections`/`paths`, `tilth_search` with several symbols), never many `sed -n` slices. Don't re-grep what you already have.
-- Investigating: one broad gather (search + read + git log together), then act; not grep -> read -> grep -> read.
+- Investigating: one broad gather (search + read + git log together), then act; not grep -> read -> grep -> read. The `serial-call-nudge.py` hook warns after 8 single-tool calls in a row.
 - Several edits to a file go in one message. Don't re-read just-edited files or re-verify what the tool already confirmed.
 
 ## Waiting / polling
@@ -21,7 +21,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 - NO cap on concurrent chats (founder 2026-10-17). Keep each chat lean instead.
 - Unattended work runs to completion through auto-compactions; never stop or ask for a new chat just because context is big.
 - Start the NEXT job in a fresh chat (handoff + paste-in starter) once the current one is done or blocked only on the founder; no 26-43h marathon chats. The hook after 4 auto-compactions (then every 2) is a "fresh chat for the next job" reminder, not a stop signal.
-- autoCompactWindow is 250000; don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
+- autoCompactWindow is 200000 (lower = cheaper); don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
 
 ## Model + delegation
 - Main chats default to Sonnet; go Opus only for a genuinely hard stretch, then back. Main chat not on Opus stays orchestrator + straightforward edits; hard thinking goes to `opus-thinker`.

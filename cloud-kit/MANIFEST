@@ -4,6 +4,7 @@ cloud-kit/agents/opus-thinker.md
 cloud-kit/agents/sonnet-builder.md
 cloud-kit/hooks/auto-ship-check.py
 cloud-kit/hooks/context-size-nudge.py
+cloud-kit/hooks/serial-call-nudge.py
 cloud-kit/hooks/status-page-heartbeat.py
 cloud-kit/rules/credential-handoffs.md
 cloud-kit/rules/git-workflow.md
