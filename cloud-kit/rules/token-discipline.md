@@ -21,7 +21,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 - NO cap on concurrent chats (founder 2026-10-17). Keep each chat lean instead.
 - Unattended work runs to completion through auto-compactions; never stop or ask for a new chat just because context is big.
 - Start the NEXT job in a fresh chat (handoff + paste-in starter) once the current one is done or blocked only on the founder; no 26-43h marathon chats. The hook after 4 auto-compactions (then every 2) is a "fresh chat for the next job" reminder, not a stop signal.
-- autoCompactWindow is 200000 (lower = cheaper); don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
+- autoCompactWindow is 250000 (founder 2026-10-17: chats normally sit ~250k, 200k felt too low); don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
 
 ## Model + delegation
 - Main chats default to Sonnet; go Opus only for a genuinely hard stretch, then back. Main chat not on Opus stays orchestrator + straightforward edits; hard thinking goes to `opus-thinker`.

@@ -29,39 +29,42 @@ try:
     if size > TAIL:
         lines = lines[1:]  # first line is probably cut mid-record
     # one API response is split over several transcript entries sharing message.id, so group by id
-    msgs = {}  # newest first (insertion order while walking backwards)
+    msgs = {}  # newest first (insertion order while walking backwards): message id -> {tool_use id: name}
     for raw in reversed(lines):
         if not raw.strip():
             continue
         try:
             e = json.loads(raw)
-        except Exception:
-            continue
-        if e.get("isSidechain") or e.get("isCompactSummary"):
-            continue
-        msg = e.get("message") or {}
-        content = msg.get("content")
-        if e.get("type") == "user":
-            if isinstance(content, list) and any(c.get("type") == "tool_result" for c in content if isinstance(c, dict)):
-                continue  # tool results are part of the turn
-            if e.get("isMeta"):
+            if e.get("isSidechain") or e.get("isCompactSummary"):
                 continue
-            break  # a real user prompt ends the turn
-        if e.get("type") != "assistant" or not isinstance(content, list):
-            continue
-        mid = msg.get("id") or e.get("uuid")
-        names = msgs.setdefault(mid, [])
-        names += [c.get("name", "") for c in content if isinstance(c, dict) and c.get("type") == "tool_use"]
+            msg = e.get("message") or {}
+            content = msg.get("content")
+            if e.get("type") == "user":
+                if isinstance(content, list) and any(c.get("type") == "tool_result" for c in content if isinstance(c, dict)):
+                    continue  # tool results are part of the turn
+                if e.get("isMeta"):
+                    continue
+                break  # a real user prompt ends the turn
+            if e.get("type") != "assistant" or not isinstance(content, list):
+                continue
+            mid = msg.get("id") or e.get("requestId") or e.get("uuid")
+            uses = msgs.setdefault(mid, {})
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "tool_use":
+                    uses[c.get("id") or len(uses)] = c.get("name", "")
+        except Exception:
+            continue  # one malformed entry must not silence the hook
     sid_state = os.path.expanduser("~/.claude/state")
     sp = os.path.join(sid_state, f"serial-nudge-{sid}.json")
     try:
         fired = json.load(open(sp)).get("fired")
     except Exception:
         fired = None
-    # trailing streak of single batchable calls; a parallel batch, an edit, an agent or plain text ends it
+    # trailing streak of single batchable calls; a parallel batch, an edit or an agent call ends it
     run = since = 0
     seen_fired = False
-    for mid, names in msgs.items():
+    for mid, uses in msgs.items():
+        names = list(uses.values())
         if not names:
             continue  # text/thinking-only entry; not a call
         if len(names) != 1 or not (names[0] in BATCHABLE or names[0].startswith(BATCHABLE_PREFIX)):
