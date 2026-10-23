@@ -68,6 +68,10 @@ Produces docs a new contributor (or AI agent) can trust without cross-checking t
 
 Golden rule: **every factual claim resolves to a grepable symbol.** If you can't grep it, don't write it.
 
+**`seo-geo`** — Data-first SEO, GEO and AI-search playbook.
+
+The 7-step workflow (project instructions, About My Business, buyer-question gaps, audit, strategy, week-1 implementation, Monday dashboard) wired to the unleashed-funnel-factory engine (`seo-audit`, `indexnow`, `seo-playbook`, `seo-weekly`). Truth rule: no invented stats, rankings or reviews; absent providers are "not connected". Reference files cover AI-bot robots rules, backlinks and distilled open-seo methods.
+
 **`high-level`** — High-Level mode: end-state-only reporting.
 
 Like caveman mode, but you keep normal sentences and drop everything the reader doesn't need. No narration while the agent works, then one final message: **Done / Remaining / Heads-up / Proof / Needs you**, one line per item, each fact said once, with no line cap so open items are never dropped. Say "high-level mode" (or `/high-level`) to turn it on and "normal mode" to turn it off.
