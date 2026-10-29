@@ -84,9 +84,18 @@ def load_guard():
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
-    except Exception as exc:  # noqa: BLE001 - a broken guard must not kill the report
+    except BaseException as exc:  # noqa: BLE001 - a broken guard must not kill the report
         print(f"(memory-guard.py failed to load: {exc.__class__.__name__}; its checks are skipped)")
         return None
+
+
+def guarded(call, default):
+    """Run a memory-guard helper; a bug in it must not kill the report."""
+    try:
+        return call()
+    except BaseException as exc:  # noqa: BLE001 - includes SystemExit from the guard
+        print(f"(memory-guard check failed: {exc.__class__.__name__})")
+        return default
 
 
 def section(title: str) -> None:
@@ -96,7 +105,7 @@ def section(title: str) -> None:
 def update_status() -> str:
     out = run(["softwareupdate", "-l"], timeout=60)
     if out is None:
-        return "unknown (check timed out)"
+        return "unknown (check failed or timed out)"
     if "Label:" in out:
         return "yes"
     return "no" if "No new software available" in out else "unknown"
@@ -113,7 +122,8 @@ def main() -> None:
           f" · pressure {({'1': 'normal', '2': 'WARNING', '4': 'CRITICAL'}).get(level, level or '?')}")
     print("healthy: free >= 30%, swap < 4 GB")
     if guard:
-        print("biggest: " + ", ".join(f"{n} {mb / 1024:.1f} GB" for n, mb in guard.top_memory_users(6)))
+        users = guarded(lambda: guard.top_memory_users(6), [])
+        print("biggest: " + ", ".join(f"{n} {mb / 1024:.1f} GB" for n, mb in users))
 
     section("CPU (top 6, % averaged over the last minute)")
     for line in sh(["ps", "-Ao", "pcpu,comm", "-r"]).splitlines()[1:7]:
@@ -128,7 +138,7 @@ def main() -> None:
     print(f"Claude Code sessions running: {claude_sessions}, including this one (aim for 2-3 on 8 GB)")
     print(f"Chrome tab/renderer processes: {renderers}")
     if guard:
-        print(f"orphaned tool processes (memory-guard reaps after 10 min): {len(guard.orphan_candidates())}")
+        print(f"orphaned tool processes (memory-guard reaps after 10 min): {len(guarded(guard.orphan_candidates, {}))}")
 
     section("Background jobs with a failing last exit")
     failing = []
