@@ -21,10 +21,11 @@ the Claude app, Chrome and Claude Code sessions; some swap is normal.
 
 ## Cache verdicts
 
-- npm / bun / uv / pip caches, Xcode DerivedData, `~/Library/Caches`: safe to clear and they regrow. Worth it only when disk is tight.
+- npm / bun / uv caches, Xcode DerivedData: safe to clear and they regrow. Worth it only when disk is tight.
+- `~/Library/Caches`: never wipe it whole (apps lose logins/state). Clear only named folders of tools you know (pip, Homebrew, an uninstalled app's folder).
 - Claude app cache (`~/Library/Application Support/Claude/Cache`, about 1 GB, plus Code Cache): it's web cache for the app's pages. Clearing it gains space for days only and makes the app slower until it refills. Skip unless disk < 15 GB. Never clear `Partitions`: the browser-pane logins live there.
 - Voice Memos: iCloud sync on this Mac is OFF on purpose. With it on, the Mac keeps a full copy (6.8 GB). The recordings live on the iPhone and in iCloud.
-- Photos: iCloud Photos is off. If the library bloats, the stale `database/search` index is the likely cause (it was 4.3 GB). Quit Photos, move that folder to the Trash, and Photos rebuilds it.
+- Photos: iCloud Photos is off. If the library bloats, the stale `database/search` index is the likely cause (it was 4.3 GB). Don't edit inside the library yourself: give the founder the Photos repair step (quit Photos, hold ⌥⌘ while opening it, choose Repair), or ask before touching that folder.
 - Docker (about 3.5 GB): KEEP. The unleashed-voice docker-compose stack, Studio's test-db and deploy scripts need it. While it's quit it costs disk only.
 - WhatsApp (about 6 GB): the founder clears it via WhatsApp → Settings → Storage and data → Manage storage.
 
