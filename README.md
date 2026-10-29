@@ -37,6 +37,8 @@ ln -s ~/Developer/unleashed-superpowers/skills/designing-ai-systems \
       ~/.claude/skills/designing-ai-systems
 ln -s ~/Developer/unleashed-superpowers/skills/document-feature-module \
       ~/.claude/skills/document-feature-module
+ln -s ~/Developer/unleashed-superpowers/skills/mac-tuneup \
+      ~/.claude/skills/mac-tuneup
 
 # Commands
 ln -s ~/Developer/unleashed-superpowers/commands/ai-native-reframe.md \
