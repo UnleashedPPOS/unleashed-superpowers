@@ -24,6 +24,17 @@ Fill the ledger in the PR body or the wave summary. One row per line, the state 
 - [ ] Accessibility: labels on pressables, 44 px targets, reduced-motion respected, text wraps.
 - [ ] Web export still builds (`expo export --platform web`) or the surface is explicitly native-only with a guard.
 
+## 2b · Visual QA (any screen a user sees; HARD RULE, 2026-11-09)
+Founder, after a demo Directory shipped with mismatched tiles and uneven boxes: "I should never see the app looking like this… these checks should be catching it." A passing test suite says nothing about how a screen looks. A screenshot is evidence only after you have LOOKED at it and written what you saw.
+- [ ] Screenshots exist for every changed or new screen, in BOTH desktop width (~1280) and phone width (390), in dark and light if the app supports both, and for the empty, loading, error and long-content states. No screenshot = `NOT DONE`.
+- [ ] Each screenshot is inspected, not just taken. Write one line per screenshot saying what you checked. Look for: text cut off, clipped or ellipsised where it should wrap; words overflowing a box; overlapping elements; anything under a notch, tab bar or banner; icons or images missing or broken; stray placeholder text, raw keys or `undefined`.
+- [ ] Consistency: one tile/card/button style per list (same height, padding, icon treatment, label case); no two styles side by side; grids line up on a clear row and column rhythm with no orphans or ragged heights; spacing and type sizes come from the theme, not one-offs.
+- [ ] No duplication: each screen or action appears once on a page unless the repeat is deliberate. Sections have a clear reason to exist.
+- [ ] Density: one primary job per screen. If it looks busy (many competing tiles, three sub-headings above the fold, walls of text), cut or group before shipping, don't ship and apologise.
+- [ ] Phone view is checked on its own, not assumed from desktop: tap targets 44 px, nothing horizontal-scrolls, text still wraps at 390 and at the largest text size.
+- [ ] Zoom into suspicious regions (crop the screenshot) before saying "looks fine". "Looks fine" without naming what you checked is not a pass.
+- [ ] If the screen is bad, fix it in the same PR. Never list "UI is rough" under Remaining. Before/after screenshots go in the PR body.
+
 ## 3 · Back end / data
 - [ ] Tables have RLS (owner + service_role paths) and a migration that passes the idempotency checker.
 - [ ] Every client insert/select uses columns that exist in the migration (grep both sides).
@@ -73,6 +84,7 @@ Fill the ledger in the PR body or the wave summary. One row per line, the state 
 DoD · <feature>  —  DONE 31 · N/A 4 · OWNER 3 · NOT DONE 0
 1 Intent ........ DONE
 2 Front end ..... DONE (hint added on Home)
+2b Visual QA ... DONE (desktop + phone shots inspected, tiles unified)
 3 Back end ...... OWNER: Elliot — supabase db push (no CLI token in cloud env)
 ...
 ```
