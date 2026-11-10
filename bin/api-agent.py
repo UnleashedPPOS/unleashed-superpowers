@@ -61,6 +61,8 @@ def main():
     a.add_argument("--model", default="claude-sonnet-5-5"); a.add_argument("--budget-usd", type=float, default=40)
     a.add_argument("--log", default=None); a.add_argument("--max-turns", type=int, default=600)
     o = a.parse_args()
+    if os.path.exists(o.prompt_file + ".model"):  # per-task model override (lets a running pipeline switch model)
+        o.model = open(o.prompt_file + ".model").read().strip()
     log = open(o.log, "a") if o.log else sys.stdout
     pin, pout = PRICES.get(o.model, (5.0, 25.0))
     system = [{"type": "text", "cache_control": {"type": "ephemeral"}, "text":

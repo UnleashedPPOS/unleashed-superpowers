@@ -34,7 +34,8 @@ import json, os, re, subprocess, sys
 from datetime import datetime
 
 HOME = os.path.expanduser("~")
-SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/")
+SKIP_PREFIXES = (f"{HOME}/.claude/", "/tmp/", "/private/tmp/", "/var/folders/",
+                 f"{HOME}/Library/Application Support/Claude/side-session-notes/")  # status pages / handoff notes
 # Allowlist: only plain notes/handoffs/docs count as docs. Anything else (prompts, rules,
 # skills, deployed content, dependency lists) is treated as code.
 DOC_FILE = re.compile(r"(^|/)(README|CHANGELOG|HANDOFF|NOTES|TODO|PROGRESS|LESSONS)[^/]*\.(md|txt)$"
