@@ -33,6 +33,10 @@ def call(body):
             if e.code in (429, 500, 529) and attempt < 5:
                 time.sleep(15 * (attempt + 1)); continue
             raise SystemExit(f"API error {e.code}: {msg}")
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:  # network blips (broken pipe etc.)
+            if attempt < 5:
+                time.sleep(15 * (attempt + 1)); continue
+            raise SystemExit(f"network error: {e}")
 
 
 def run_tool(name, inp, cwd):
