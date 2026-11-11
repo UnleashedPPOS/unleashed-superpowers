@@ -8,6 +8,7 @@ cloud-kit/hooks/serial-call-nudge.py
 cloud-kit/hooks/status-page-heartbeat.py
 cloud-kit/rules/credential-handoffs.md
 cloud-kit/rules/git-workflow.md
+cloud-kit/rules/llm-provider-chain.md
 cloud-kit/rules/openrouter-os-mobile-only.md
 cloud-kit/rules/research-memory.md
 cloud-kit/rules/share-setup.md
