@@ -8,7 +8,7 @@ Why: the account had $1.99 left on 2026-11-11 and there is no money to top up. I
 - OpenRouter credit is reserved for the live Unleashed OS mobile app (and the backend functions that app calls). Nothing else.
 - NEVER call OpenRouter for: tests, evals, probes, replays, local dev, leadgen, outreach, Factory, Newsroom, Arena, Studio, research, scripts, agents, cloud routines or any new feature outside the OS mobile app. This also retires the dev-key allowance in `openrouter-deepseek.md` for now: no dev-key runs either.
 - Everything else uses a non-OpenRouter provider first (see memory `reference-llm-provider-chain` for the current order and keys). Gemini is not an option right now.
-- Even inside the OS mobile app, OpenRouter should be the LAST fallback, not the first hop, wherever a free or credit-funded provider can do the job.
+- Inside the OS mobile app OpenRouter may stay the FIRST hop (founder 2026-11-12: "as long as the mobile fallback works perfectly and works instantly, it's fine if OpenRouter still remains the initial thing"). The condition is the fallback: every OS call must fail over to Bedrock → Groq → Anthropic with no gap on a refusal, timeout or empty reply, and that must stay covered by tests. New OS features with no fallback are not allowed.
 - Before adding or changing any LLM call: check which provider it hits. If it is OpenRouter and not the OS mobile app, move it or stop and tell the founder.
 - Found a non-OS caller on OpenRouter? Move it off or switch it off, and report it. Don't leave it running.
 
