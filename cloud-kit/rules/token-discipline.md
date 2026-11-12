@@ -39,6 +39,13 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 - Fork (`subagent_type: "fork"`) runs on my model with this whole context: only when the task needs what this chat knows AND context < ~60k. Otherwise a fresh Haiku/Sonnet agent with a self-contained brief. Ad-hoc agents must pass `model:`.
 - Cloud first: anything that can run in the cloud runs as a one-shot cloud routine (RemoteTrigger, model per table), not a local Agent (`Agent isolation:"remote"` silently runs LOCALLY). Stay local only for vault secrets, DB/deploy CLIs, ssh to the build box, the built-in browser, or repos without a remote. At most ONE local sub-agent at a time (8GB laptop).
 
+## Where work runs (measured 2026-11-12; memory `reference-where-work-runs`)
+- Cloud sandbox per run: 4 vCPU, 15 GB RAM, 30 GB disk, with Postgres 16, Redis, Playwright Chromium, sudo and apt. unleashedos there: install 4s, typecheck 33s, lint 15s, 5,293 unit tests 3m19s, build 22s. Send unit tests, typecheck, lint, web builds, e2e against a local server and review here.
+- Cloud can't: Docker (no daemon), deno (missing; deno.land blocked), supabase / vercel / aws CLIs, vault secrets, ssh to Netcup, or reach Groq, OpenRouter, Expo, Apple, Google, YouTube. Start Postgres as a non-root user (initdb refuses root).
+- Netcup (4 vCPU, 7.8 GB RAM, 8 GB+ swap in use, load above its core count) is full: CI finishes about 12 jobs an hour, in practice one at a time, and PR checks wait 2h+. Keep it for always-on services, Docker builds, deno tests and deploys. Don't add test load there and never raise CI parallelism.
+- Netcup `/tmp` is 3.9 GB of RAM: never clone, install or build in `/tmp` there (use `/opt/ci-workdirs` or `/var/tmp`). `/usr/local/sbin/tmp-hygiene.sh` clears stale scratch hourly.
+- Laptop: vault secrets, deploy CLIs, the built-in browser, phone builds. No test suites or installs while more than 3 chats are open.
+
 ## Disk hygiene (228GB laptop)
 - Remove your worktree the moment its PR merges (`git worktree remove <path>`). No `bun install` / `uv sync` / `npm i` in a throwaway worktree unless the task runs code there. Don't clone a repo just to read it (`gh api` / `gh repo view` / cloud routine). `~/bin/disk-maintenance.sh` runs daily (`restore <repo>` brings back an offloaded repo).
 
