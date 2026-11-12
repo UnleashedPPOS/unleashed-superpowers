@@ -14,6 +14,13 @@ Goes with `openrouter-os-mobile-only.md`. OpenRouter has about $2 left and is re
 
 OpenRouter leaves the default chain. Keep it only as an opt-in last hop behind env `LLM_ALLOW_OPENROUTER=1` (default off).
 
+## Cheapest model that passes (founder 2026-11-12: "stick to the cheaper models… still monitoring quality")
+- Pick the cheapest Bedrock model that passes the job's eval. Order to try: `openai.gpt-oss-20b-1:0` (bulk, extraction, summaries) → `mistral.ministral-3-14b-instruct` (classification, routing; fastest) → `openai.gpt-oss-120b-1:0` (tool calls, writing, anything user-facing). Claude Haiku is the last hop only, never a first choice.
+- Voice commands, 322 cases on Bedrock (2026-11-12): gpt-oss-120b 248, same with low reasoning 240, ministral-3-14b 235 (twice as fast), glm-4.7-flash 210, qwen3-next-80b 210. So tool-critical stays on gpt-oss-120b.
+- Moving a job to a cheaper model: run that repo's eval on both, report both scores, and switch only if the cheaper one is within 2% (my default; founder can change it). No eval for the job means write a small one first.
+- Log provider, model and which hop answered on every call. A rising share of Haiku or Groq answers means the cheap hop is failing: fix it, don't leave it.
+- Two Bedrock endpoints work with the same key: `bedrock-runtime.<region>.amazonaws.com/openai/v1` needs the `-1:0` ids; `bedrock-mantle.<region>.api.aws` (used by unleashedos) takes the bare ids (`openai.gpt-oss-120b`). Don't mix them.
+
 ## Behaviour
 - A missing key skips that provider. 401 / 402 / 403 / 429 skip straight to the next provider (never stop the chain).
 - Short connect timeout so a dead provider fails over fast.
