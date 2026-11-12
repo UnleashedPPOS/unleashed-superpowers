@@ -12,6 +12,8 @@ Goes with `openrouter-os-mobile-only.md`. OpenRouter has about $2 left and is re
    - Plain OpenAI body otherwise. Never send OpenRouter-only fields (`reasoning`, `provider`, `plugins`, `transforms`).
 2. **Groq**: `https://api.groq.com/openai/v1/chat/completions`, `Bearer $GROQ_API_KEY`, `openai/gpt-oss-120b` or `openai/gpt-oss-20b`. Free tier, rate-limited. No health or journal content.
 3. **Anthropic**: `https://api.anthropic.com/v1/chat/completions`, `Bearer $ANTHROPIC_API_KEY`, `claude-haiku-5-5`. Paid; last resort.
+   - Haiku 5.5 returns 400 for `temperature`, `top_p`, `response_format: json_object` and `json_schema` without `strict` (verified 2026-11-12). Strip them on the Anthropic hop only and ask for JSON in the prompt, or the last hop is dead. Cover it with a test.
+   - gpt-oss reasoning tokens count against `max_tokens` even with `include_reasoning: false`: give JSON jobs headroom (Arena's 1,800 came back cut off 4 times in 5; use about 4,000) and treat `finish_reason: length` as a failure.
 
 OpenRouter leaves the default chain. Keep it only as an opt-in last hop behind env `LLM_ALLOW_OPENROUTER=1` (default off).
 
