@@ -8,7 +8,8 @@ Goes with `openrouter-os-mobile-only.md`. OpenRouter has about $2 left and is re
    - `openai.gpt-oss-20b-1:0`: cheap and fast (about 0.5s), bulk and extraction.
    - `mistral.ministral-3-14b-instruct` and `zai.glm-4.7-flash`: us-east-1 only; classification, tool routing.
    - Images: `us.amazon.nova-2-lite-v1:0` (Converse API; not checked on the OpenAI-compatible path). If that is awkward, send image jobs to Anthropic.
-   - Plain OpenAI body. Never send OpenRouter-only fields (`reasoning`, `provider`, `plugins`, `transforms`).
+   - gpt-oss on `bedrock-runtime` (verified 2026-11-12): always send `"include_reasoning": false`, or `content` starts with a `<reasoning>…</reasoning>` block. Never send `response_format` to gpt-oss (returns malformed JSON); ask for JSON in the prompt, validate, fail over if it doesn't parse. Strip a leading `<reasoning>`/`<think>` block defensively. `bedrock-mantle` returns reasoning in a separate field, so content is clean there.
+   - Plain OpenAI body otherwise. Never send OpenRouter-only fields (`reasoning`, `provider`, `plugins`, `transforms`).
 2. **Groq**: `https://api.groq.com/openai/v1/chat/completions`, `Bearer $GROQ_API_KEY`, `openai/gpt-oss-120b` or `openai/gpt-oss-20b`. Free tier, rate-limited. No health or journal content.
 3. **Anthropic**: `https://api.anthropic.com/v1/chat/completions`, `Bearer $ANTHROPIC_API_KEY`, `claude-haiku-5-5`. Paid; last resort.
 
