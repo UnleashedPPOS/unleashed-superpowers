@@ -46,6 +46,14 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 - Netcup `/tmp` is 3.9 GB of RAM: never clone, install or build in `/tmp` there (use `/opt/ci-workdirs` or `/var/tmp`). `/usr/local/sbin/tmp-hygiene.sh` clears stale scratch hourly.
 - Laptop: vault secrets, deploy CLIs, the built-in browser, phone builds. No test suites or installs while more than 3 chats are open.
 
+## When a place is at its limit (founder 2026-11-14: "what to do if something is getting used to its max")
+Check once before heavy work, one command, never a loop: laptop `memory_pressure | tail -1; sysctl vm.swapusage; uptime; df -h / | tail -1`; server `ssh netcup-render 'uptime; free -m | sed -n 2p; df -h /tmp / | tail -2'`. Cloud has no gauge: it is "full" when a run 429s, times out or the probe fails.
+- **Laptop over** (memory free under 30%, swap over 4 GB, load over 8, disk under 25 GB, or more than 3 chats): no local sub-agent, install or test suite. Move the work to the cloud. Work that needs vault or deploy CLIs runs alone, one at a time. Run `/mac-tuneup`, name which chats the founder should close, never quit their apps. Disk under 25 GB: also stop builds and downloads.
+- **Server over** (load above 4, swap over 10 GB, `/tmp` over 80%, or ENOSPC in health checks): add nothing. Docker builds and deno tests queue; PR checks go through cloud CI (the server runs them itself only after the 30 min timeout). `/tmp` over 80%: run `/usr/local/sbin/tmp-hygiene.sh` first. Never raise CI parallelism, restart the runner or cancel queued jobs.
+- **Cloud over or down** (429, usage limit, timeout, blocked host): run 1-2 at a time, not 3-4. A PR check just waits for the server fallback; don't duplicate it. Ad hoc test runs go to the laptop only if the laptop is under its limits, else queue them and say "waiting on cloud" once.
+- **All three full**: finish in this order: production fixes, then merges, then everything else waits. Report once what is parked and why; don't retry on a timer.
+- Never fix overload by deleting things that serve users (volumes, images tagged for rollback, stopped product containers) or by touching Arena.
+
 ## Disk hygiene (228GB laptop)
 - Remove your worktree the moment its PR merges (`git worktree remove <path>`). No `bun install` / `uv sync` / `npm i` in a throwaway worktree unless the task runs code there. Don't clone a repo just to read it (`gh api` / `gh repo view` / cloud routine). `~/bin/disk-maintenance.sh` runs daily (`restore <repo>` brings back an offloaded repo).
 
