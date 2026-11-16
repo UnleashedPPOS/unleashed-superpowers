@@ -9,7 +9,7 @@ Every founder correction from the always-loaded rules and the High-Level output 
 - **eval**: behaviour a regex can't judge; a `claude plugin eval` case under `evals/`.
 - **prose**: judgement; stays as a rule line. The *Home* column is the one place it lives.
 
-Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded words: 3814.
+Totals: 103 corrections; 35 checks, 9 evals, 59 prose. Always-loaded words: 3886.
 
 | ID | Rule | Class | Enforced by | Home | Source |
 |---|---|---|---|---|---|
@@ -24,6 +24,7 @@ Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded words: 3814
 | `test-account-delete` | Never delete, soft-delete or clean up a registered test account. | check | `test-account-delete` (bash, write → block) | `cloud-kit/rules/test-accounts.md` | rules/test-accounts.md (2026-11-06 incident) |
 | `autocompact-window` | autoCompactWindow stays 250000; never commit a different number. | check | `autocompact-window` (write → block) | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md (founder 2026-10-17) |
 | `batch-tool-calls` | Batch independent tool calls; never 8+ single calls in a row. | check | cloud-kit/hooks/serial-call-nudge.py | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
+| `never-fable-subagent` | Never Fable for lanes, routines or sub-agents. | check | `never-fable-subagent` (agent, write → block) | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md (founder HARD RULE 2026-11-16: two lanes died on the weekly Fable limit) |
 | `rules-word-budget` | Always-loaded rules stay under the word budget. | check | tests/learning/test_word_budget.py | `cloud-kit/rules/token-discipline.md` | brief 2026-11-16 item 5 |
 | `session-size-not-a-reason` | Context size is never a reason to defer; never say 'keeping the session small'. | check | same check: deferral-in-reply | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `login-for-cli-tool` | Never ask the founder to log in to a tool we drive by CLI + vault key. | check | `login-for-cli-tool` (reply → block) | `cloud-kit/rules/user-handoffs.md` | rules/credential-handoffs.md (founder 2026-10-01) |
@@ -78,13 +79,13 @@ Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded words: 3814
 | `cheaper-tier-first` | Unsure of tier: cheaper first, escalate one tier on weak results. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `cloud-first` | Cloud first; at most one local sub-agent. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `effort-medium` | Effort medium by default; high only when genuinely hard. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
-| `fable-main-chat` | Main chat on Fable for judgement, synthesis and features. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `fresh-chat-next-job` | Start the next job in a fresh chat with a handoff. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `lean-context` | No whole-file reads of big files; filter output; CLIs over connectors. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
-| `model-table` | One model table: Fable features, Sonnet fixes/reviews, Haiku specified work, Opus hard calls. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
+| `model-table` | Plan in Opus, build in Sonnet (Haiku for mechanical), review and ship-check in Opus. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md (founder HARD RULE 2026-11-16) |
 | `no-still-waiting` | Never send 'still waiting' turns; blocked is said once. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `one-watcher` | One watcher for all PRs; exit on a ~60 min stall. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `read-once` | Read a file region once in a generous chunk; don't re-grep. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
+| `subagent-budget` | At most 3 sub-agents per lane or chat; reuse one via SendMessage. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md (founder 2026-11-16) |
 | `subagent-one-result` | Sub-agents work silently and return one result under 300 words. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `wait-handoff` | Waiting > 5 min: end the turn, handoff file, resume via notification/wakeup. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `finish-after-paste` | After the founder pastes, do every downstream step. | prose | prose | `cloud-kit/rules/user-handoffs.md` | rules/user-handoffs.md |

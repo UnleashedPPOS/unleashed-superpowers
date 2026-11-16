@@ -172,6 +172,14 @@ class EventTest(TempHome):
                          "tool_input": {"file_path": "src/pages/Home.tsx", "edits": [{"old_string": "a", "new_string": "The Uber for coaches"}]}})
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_pre_tool_agent_model(self):
+        out = self.call({"hook_event_name": "PreToolUse", "tool_name": "Agent",
+                         "tool_input": {"description": "d", "prompt": "p", "model": "fable"}})
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+        self.assertIn("never-fable-subagent", out["hookSpecificOutput"]["permissionDecisionReason"])
+        self.assertIsNone(self.call({"hook_event_name": "PreToolUse", "tool_name": "Agent",
+                                     "tool_input": {"description": "d", "prompt": "model: fable", "model": "sonnet"}}))
+
     def test_pre_tool_quiet_on_good(self):
         self.assertIsNone(self.call({"hook_event_name": "PreToolUse", "tool_name": "Bash",
                                      "tool_input": {"command": "npm test"}}))

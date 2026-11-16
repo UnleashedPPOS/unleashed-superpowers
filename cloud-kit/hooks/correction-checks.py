@@ -4,7 +4,7 @@
 Founder 2026-11-16: corrections typed into Claude should become verifiers, checks, skills and
 hooks, because many are never learned and he repeats himself. One script, four events:
 
-  PreToolUse        Bash / Edit / Write / MultiEdit / NotebookEdit: "block" checks deny the call,
+  PreToolUse        Bash / Edit / Write / MultiEdit / NotebookEdit / Agent: "block" checks deny the call,
                     "ask" checks ask first (credentials, OpenRouter outside the OS app, banned
                     providers, "X for Y" brand copy, empty commits, test-account deletes ...).
   PostToolUse       "warn" checks on the same input add a nudge (commit message format), and text
@@ -23,6 +23,7 @@ import corrections_lib as lib  # noqa: E402
 
 MAX_READ = 8 << 20
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+AGENT_TOOLS = {"Agent", "Task"}  # only the model / subagent_type fields are checked, never the prompt
 NOT_A_PROMPT = ("<local-command", "[Request interrupted", "<task-notification", "<side-sessions-event",
                 "<ci-monitor-event")
 ARTIFACT_URL = re.compile(r"https://claude\.ai/(?:code/)?artifact/[\w-]+")
@@ -40,6 +41,8 @@ def tool_surface(name, inp):
         else:
             text = inp.get("content") or inp.get("new_string") or inp.get("new_source") or ""
         return "write", text, inp.get("file_path") or inp.get("notebook_path") or ""
+    if name in AGENT_TOOLS:
+        return "agent", f"model: {inp.get('model') or ''}\nsubagent_type: {inp.get('subagent_type') or ''}", ""
     return None
 
 

@@ -950,19 +950,54 @@
   },
   {
    "id": "model-table",
-   "rule": "One model table: Fable features, Sonnet fixes/reviews, Haiku specified work, Opus hard calls.",
-   "source": "rules/token-discipline.md",
+   "rule": "Plan in Opus, build in Sonnet (Haiku for mechanical), review and ship-check in Opus.",
+   "source": "rules/token-discipline.md (founder HARD RULE 2026-11-16)",
    "class": "prose",
    "home": "cloud-kit/rules/token-discipline.md",
-   "anchor": "the one model table"
+   "anchor": "plan in Opus -> build in Sonnet"
   },
   {
-   "id": "fable-main-chat",
-   "rule": "Main chat on Fable for judgement, synthesis and features.",
-   "source": "rules/token-discipline.md",
+   "id": "never-fable-subagent",
+   "rule": "Never Fable for lanes, routines or sub-agents.",
+   "source": "rules/token-discipline.md (founder HARD RULE 2026-11-16: two lanes died on the weekly Fable limit)",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "NEVER Fable",
+   "surface": [
+    "agent",
+    "write"
+   ],
+   "action": "block",
+   "check": "regex",
+   "flags": "im",
+   "pattern": "(?:^|[{,])\\s*\"?model\"?\\s*:\\s*[\"']?(?:claude-)?fable\\b",
+   "message": "Never Fable for lanes, routines or sub-agents (founder HARD RULE 2026-11-16). Build in Sonnet, plan and review in Opus.",
+   "bad": [
+    "model: fable\nsubagent_type: general-purpose",
+    {
+     "path": "/r/kit/cloud-kit/agents/builder.md",
+     "text": "---\nname: builder\nmodel: fable\n---\n"
+    },
+    {
+     "path": "/r/app/routine.json",
+     "text": "{\"model\": \"claude-fable-5-2\"}"
+    }
+   ],
+   "good": [
+    "model: sonnet\nsubagent_type: sonnet-builder",
+    {
+     "path": "/r/kit/cloud-kit/agents/builder.md",
+     "text": "---\nname: builder\nmodel: sonnet\n---\nNever use Fable here.\n"
+    }
+   ]
+  },
+  {
+   "id": "subagent-budget",
+   "rule": "At most 3 sub-agents per lane or chat; reuse one via SendMessage.",
+   "source": "rules/token-discipline.md (founder 2026-11-16)",
    "class": "prose",
    "home": "cloud-kit/rules/token-discipline.md",
-   "anchor": "Fable stays in the driver's seat"
+   "anchor": "at most 3 sub-agents per lane/chat"
   },
   {
    "id": "cheaper-tier-first",
