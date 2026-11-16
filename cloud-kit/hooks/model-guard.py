@@ -26,7 +26,7 @@ FABLE = re.compile(r"fable", re.I)
 SCRIPT_FABLE = re.compile(r"""model\s*[:=]\s*['"`][^'"`]*fable""", re.I)
 REVIEW_NAME = re.compile(r"ship-?check|\breview(er)?\b|\bred-?team\b|^R\d+\b", re.I)
 HELPER = r"(?:sub-?agents?|helper[- ]agents?|helpers)"
-LIMIT = r"(?:at most|max(?:imum)?|no more than|up to|cap(?:ped)?(?: of| at)?|limit(?:ed)?(?: of| to)?|≤|<=)"
+LIMIT = r"(?:at most|max(?:imum)?|(?:no|not|never) (?:use )?more than|up to|cap(?:ped)?(?: of| at)?|limit(?:ed)?(?: of| to)?|≤|<=)"
 CAP = re.compile(
     rf"{LIMIT}\s*:?\s*\d+\s*(?:\w+\s+)?{HELPER}"          # "at most 3 sub-agents", "max 2 Sonnet helpers"
     rf"|{HELPER}[^.\n]{{0,60}}?{LIMIT}\s*:?\s*\d+"         # "sub-agent budget: at most 3"

@@ -93,7 +93,8 @@ class ModelGuardTest(unittest.TestCase):
     def test_cap_phrasings_accepted(self):
         for line in ("At most 3 sub-agents.", "Use no more than 2 Sonnet helpers.",
                      "Sub-agent budget: max 3.", "No sub-agents; do it yourself.",
-                     "helper agents capped at 2", "≤3 subagents"):
+                     "helper agents capped at 2", "≤3 subagents",
+                     "Do not use more than 3 sub-agents."):
             with self.subTest(line=line):
                 self.assertIsNone(run("RemoteTrigger", routine(prompt=LONG + line)))
 
