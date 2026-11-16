@@ -62,10 +62,11 @@ printf '%s' "$installed" > "$list"
 # never deleted: they land in ~/.claude/.retired-rules/ so the change is reversible.
 if retired=$(fetch cloud-kit/RETIRED); then
   while IFS= read -r name; do
+    name=${name%$'\r'}
     case "$name" in ''|'#'*|*/*|.*) continue ;; esac
     if [ -f "$CL/rules/$name" ]; then
       mkdir -p "$CL/.retired-rules"
-      mv -f "$CL/rules/$name" "$CL/.retired-rules/$name"
+      mv -f "$CL/rules/$name" "$CL/.retired-rules/$name.$(date +%Y%m%d%H%M%S)"
     fi
   done <<< "$retired"
 fi

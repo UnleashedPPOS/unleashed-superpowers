@@ -23,7 +23,15 @@ REGISTRY = os.path.join(ROOT, "cloud-kit", "hooks", "corrections.json")
 INVENTORY = os.path.join(ROOT, "docs", "learning", "corrections-inventory.md")
 UNENFORCED = os.path.join(ROOT, "docs", "learning", "unenforced.md")
 BUDGET = os.path.join(ROOT, "docs", "learning", "budget.json")
-MAC_MEMORY = os.path.expanduser("~/.claude/projects/-Users-elliotkelly-Developer/memory")
+def _default_memory_dir():
+    """$CORRECTIONS_MEMORY_DIR, else the first ~/.claude/projects/*/memory holding feedback-*.md files."""
+    if os.environ.get("CORRECTIONS_MEMORY_DIR"):
+        return os.environ["CORRECTIONS_MEMORY_DIR"]
+    hits = sorted(glob.glob(os.path.expanduser("~/.claude/projects/*/memory/feedback-*.md")))
+    return os.path.dirname(hits[0]) if hits else os.path.expanduser("~/.claude/projects/-/memory")
+
+
+MAC_MEMORY = _default_memory_dir()
 
 
 def load():
@@ -42,7 +50,10 @@ def always_loaded_files():
 
 def word_count():
     b, files = always_loaded_files()
-    per = {os.path.relpath(f, ROOT): len(open(f).read().split()) for f in files}
+    per = {}
+    for f in files:
+        with open(f) as fh:
+            per[os.path.relpath(f, ROOT)] = len(fh.read().split())
     return b, per, sum(per.values())
 
 

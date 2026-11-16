@@ -301,9 +301,14 @@ def log_hits(hits, surface):
         pass
 
 
+_QUERY = re.compile(r"(https?://[^\s?#]+)[?#]\S*")
+
+
 def describe(hits):
-    """One line per hit. fn:secret details are credential kinds only, never the value."""
-    return "\n".join(f"- {entry['id']}: {entry['message']} (found: {detail})" for entry, detail in hits)
+    """One line per hit. fn:secret details are credential kinds only, never the value; URL query strings are masked."""
+    def mask(detail):
+        return _QUERY.sub(lambda m: m.group(1) + "?…", str(detail))
+    return "\n".join(f"- {entry['id']}: {entry['message']} (found: {mask(detail)})" for entry, detail in hits)
 
 
 # ---------------------------------------------------------------- test helpers

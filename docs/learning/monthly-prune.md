@@ -14,7 +14,8 @@ Sub-agent cap: 1.
      python3 scripts/corrections.py unenforced --check
      python3 -m unittest discover -s tests/hooks && python3 -m unittest discover -s tests/learning
    On the Mac also pass --hits ~/.claude/state/corrections-hits.jsonl and
-   --memory-dir ~/.claude/projects/-Users-elliotkelly-Developer/memory (the defaults).
+   --memory-dir <your memory dir> (defaults: the hits log above and $CORRECTIONS_MEMORY_DIR or the first
+   ~/.claude/projects/*/memory with feedback-*.md files).
 
 2. Never-fired checks (0 hits in 30 days): keep it if the mistake is rare but costly (credentials,
    OpenRouter, deleting test accounts); otherwise retire it (class -> prose, or delete the entry and its rule

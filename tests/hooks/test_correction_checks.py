@@ -172,6 +172,11 @@ class EventTest(TempHome):
                          "tool_input": {"file_path": "src/pages/Home.tsx", "edits": [{"old_string": "a", "new_string": "The Uber for coaches"}]}})
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
 
+    def test_describe_masks_url_query(self):
+        out = lib.describe([({"id": "x", "message": "m"}, "see https://h.example/p?token=abc123#frag")])
+        self.assertNotIn("abc123", out)
+        self.assertIn("https://h.example/p?", out)
+
     def test_pre_tool_agent_model(self):
         out = self.call({"hook_event_name": "PreToolUse", "tool_name": "Agent",
                          "tool_input": {"description": "d", "prompt": "p", "model": "fable"}})
