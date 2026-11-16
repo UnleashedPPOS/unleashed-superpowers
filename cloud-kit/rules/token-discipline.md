@@ -1,68 +1,37 @@
-# Token discipline (HARD RULE; condensed 2026-10-17)
+# Token discipline (HARD RULE; rewritten 2026-11-16)
 
-Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of 2026-10-14: 93% of usage was cache read/write on fat contexts, 81% Opus, 41% sub-agents (opus-thinker 24%); typed output only ~5%. Levers: fewer turns, smaller context, cheaper model. Idle > cache TTL = full rewrite at 2x.
+Why: every turn re-reads the whole chat, so cost ~ turns x context size. Levers: fewer turns, smaller context, cheaper model. Where work runs (cloud, Netcup, laptop), overload fallbacks, routines, merge trains and disk hygiene: skill `where-work-runs`, loaded before heavy work, CI waits or routines.
 
-## Tool-call loops (biggest lever; each serial call re-reads the full context)
-- Batch: independent reads/greps/commands go in ONE message (parallel tool calls) or one `ctx_batch_execute` / one script.
-- Read a file region once, in a generous chunk (or `tilth_read` with `sections`/`paths`, `tilth_search` with several symbols), never many `sed -n` slices. Don't re-grep what you already have.
-- Investigating: one broad gather (search + read + git log together), then act; not grep -> read -> grep -> read. The `serial-call-nudge.py` hook warns after 8 single-tool calls in a row.
-- Several edits to a file go in one message. Don't re-read just-edited files or re-verify what the tool already confirmed.
+## Tool calls (biggest lever)
+- Batch: independent reads/greps/commands go in ONE message (parallel calls) or one script. The `serial-call-nudge.py` hook warns after 8 single calls in a row.
+- Read a file region once, in a generous chunk; never many `sed -n` slices; don't re-grep what you have. Investigate with one broad gather, then act.
+- Several edits to a file go in one message. Don't re-read just-edited files.
 
-## Waiting / polling
-- Never send "still waiting / checking again" turns. Nothing changed -> end the turn silently.
-- One consolidated check for ALL lanes/PRs/routines in a single command, at most every 30+ min. Prefer ONE blocking watcher: `~/.claude/bin/lanes-wait OWNER/REPO#N ...` in the background (exit 0 any change, 2 timeout, 1 gh failed); `--once` = one snapshot; `--comments '^R[0-9]+ (review|follow-up)'` also wakes on review verdicts; missing PRs skipped.
-- Waiting > 5 min: end the turn, write state to a handoff file, resume via notification or ScheduleWakeup (1200s+). Never sleep inside a big session; don't re-poll CI/routines by hand.
-- Blocked on CI or the founder: say "waiting on X" ONCE, then back off to every few hours or stop.
-- A watcher must also exit on stall (no PR/CI/issue change in ~60 min); 2026-10-01 one sat 9h on a frozen CI box.
-- Cloud lanes never wait on self-hosted CI; they make PRs ready and a local merger merges (`~/.claude/bin/pr-auto-merge`). >10 PRs queued -> one merge-train PR per repo labelled `ci:priority` immediately (memory `merge-train-playbook`).
+## Waiting
+- Never send "still waiting" turns; nothing changed -> end the turn silently. Blocked on CI or the founder: say it ONCE.
+- Waiting > 5 min: end the turn, write state to a handoff file, resume via notification or ScheduleWakeup (1200s+). One watcher for all PRs (`~/.claude/bin/lanes-wait`), never a poll loop; it must exit on a ~60 min stall.
 
 ## Session size
-- Token discipline is HOW work is done, never WHETHER. Context size is never a reason to defer, descope, skip or label work "follow-up". Big session -> delegate to sub-agents or hand off the complete remaining list as mandatory work. Never tell the founder you're "keeping the session small".
-- NO cap on concurrent chats (founder 2026-10-17). Keep each chat lean instead.
-- Unattended work runs to completion through auto-compactions; never stop or ask for a new chat just because context is big.
-- Start the NEXT job in a fresh chat (handoff + paste-in starter) once the current one is done or blocked only on the founder; no 26-43h marathon chats. The hook after 4 auto-compactions (then every 2) is a "fresh chat for the next job" reminder, not a stop signal.
-- autoCompactWindow is 250000 (founder 2026-10-17: chats normally sit ~250k, 200k felt too low); don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
+- Token discipline is HOW work is done, never WHETHER: context size is never a reason to defer, descope or skip. Never tell the founder you're "keeping the session small" ✓.
+- No cap on concurrent chats; keep each lean. Unattended work runs through auto-compactions. Start the NEXT job in a fresh chat (handoff + paste-in starter) once this one is done or blocked on the founder.
+- autoCompactWindow is 250000; never commit a different number in a repo's `.claude/settings.json` ✓.
 
-## Model + delegation
-- **Model policy (founder HARD RULE 2026-11-16): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** (11-16: two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time.
-- **Sub-agent budget (founder 2026-11-16, "you be the CFO"):** each sub-agent is a fresh context start. A lane or chat does its own build; at most 3 sub-agents per lane/chat unless the work truly splits into independent slices; reuse one via SendMessage for follow-up rounds instead of spawning new ones. Every lane prompt states its cap.
-- Main chats default to Sonnet; go Opus only for a genuinely hard stretch, then back. Main chat not on Opus stays orchestrator + straightforward edits; hard thinking goes to `opus-thinker`.
-- Use the agent files (`subagent_type` sets model + effort):
+## Models and delegation (the one model table)
+- **Model policy (founder HARD RULE 2026-11-16, newest; supersedes memory "Build in Fable"): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** ✓ (two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time.
+- **Sub-agent budget ("you be the CFO"):** each sub-agent is a fresh context start (~40k). A lane or chat does its own build; at most 3 sub-agents per lane/chat unless the work truly splits into independent slices; reuse one via SendMessage for follow-up rounds. Every lane prompt states its cap.
 
-  | Agent | Model | Use for |
-  |---|---|---|
-  | `haiku-worker` | haiku | Clear, fully specified work: sweeps, CI/PR watching, merging, plumbing, renames, boilerplate, exact plan steps, tests to spec, doc fixes, summaries |
-  | `sonnet-builder` | sonnet | **Default.** Features, known-cause fixes, refactors, routine reviews, research, write-ups |
-  | `opus-thinker` | opus | Genuinely hard/high-stakes only: design, non-obvious root causes, audits/red-team, risky decisions. Never for routine review fan-out |
+| Agent | Model | Use for |
+|---|---|---|
+| `sonnet-builder` | sonnet | **Default build**: features, known-cause fixes, refactors, routine reviews, research, write-ups |
+| `haiku-worker` | haiku | Fully specified work: sweeps, CI/PR watching, merging, plumbing, renames, tests to spec, doc fixes, summaries |
+| `opus-thinker` | opus | Planning, review + ship-check, and genuinely hard calls: design, non-obvious root causes, audits/red-team, risky decisions |
 
-- Unsure between Sonnet and Opus -> Sonnet; escalate one tier only when the result is weak or the agent says it's unsure. Haiku briefs must be self-contained (files, change, how to verify); vague -> Sonnet. Big jobs: Opus plans, Haiku mechanical slices, Sonnet judgement slices, Opus reviews.
-- Effort medium by default; `high` per call only when hard (unclear root cause, security/money/prod data); `xhigh` for the hardest only. Never raise by habit.
-- Sub-agents work silently and return ONE short result (<300 words: outcome, evidence, open items). Each costs ~40k to start; don't spawn one for a lookup you can do in 1-3 calls.
-- Fork (`subagent_type: "fork"`) runs on my model with this whole context: only when the task needs what this chat knows AND context < ~60k. Otherwise a fresh Haiku/Sonnet agent with a self-contained brief. Ad-hoc agents must pass `model:`.
-- Cloud first: anything that can run in the cloud runs as a one-shot cloud routine (RemoteTrigger, model per table), not a local Agent (`Agent isolation:"remote"` silently runs LOCALLY). Stay local only for vault secrets, DB/deploy CLIs, ssh to the build box, the built-in browser, or repos without a remote. At most ONE local sub-agent at a time (8GB laptop).
-
-## Where work runs (measured 2026-11-12; memory `reference-where-work-runs`)
-- Cloud sandbox per run: 4 vCPU, 15 GB RAM, 30 GB disk, with Postgres 16, Redis, Playwright Chromium, sudo and apt. unleashedos there: install 4s, typecheck 33s, lint 15s, 5,293 unit tests 3m19s, build 22s. Send unit tests, typecheck, lint, web builds, e2e against a local server and review here.
-- Cloud can't: Docker (no daemon), deno (missing; deno.land blocked), supabase / vercel / aws CLIs, vault secrets, ssh to Netcup, or reach Groq, OpenRouter, Expo, Apple, Google, YouTube. Start Postgres as a non-root user (initdb refuses root).
-- Netcup (4 vCPU, 7.8 GB RAM, 8 GB+ swap in use, load above its core count) is full: CI finishes about 12 jobs an hour, in practice one at a time, and PR checks wait 2h+. Keep it for always-on services, Docker builds, deno tests and deploys. Don't add test load there and never raise CI parallelism.
-- Netcup `/tmp` is 3.9 GB of RAM: never clone, install or build in `/tmp` there (use `/opt/ci-workdirs` or `/var/tmp`). `/usr/local/sbin/tmp-hygiene.sh` clears stale scratch hourly.
-- Laptop: vault secrets, deploy CLIs, the built-in browser, phone builds. No test suites or installs while more than 3 chats are open.
-
-## When a place is at its limit (founder 2026-11-14: "what to do if something is getting used to its max")
-Check once before heavy work, one command, never a loop: laptop `memory_pressure | tail -1; sysctl vm.swapusage; uptime; df -h / | tail -1`; server `ssh netcup-render 'uptime; free -m | sed -n 2p; df -h /tmp / | tail -2'`. Cloud has no gauge: it is "full" when a run 429s, times out or the probe fails.
-- **Laptop over** (memory free under 30%, swap over 4 GB, load over 8, disk under 25 GB, or more than 3 chats): no local sub-agent, install or test suite. Move the work to the cloud. Work that needs vault or deploy CLIs runs alone, one at a time. Run `/mac-tuneup`, name which chats the founder should close, never quit their apps. Disk under 25 GB: also stop builds and downloads.
-- **Server over** (load above 4, swap over 10 GB, `/tmp` over 80%, or ENOSPC in health checks): add nothing. Docker builds and deno tests queue; PR checks go through cloud CI (the server runs them itself only after the 30 min timeout). `/tmp` over 80%: run `/usr/local/sbin/tmp-hygiene.sh` first. Never raise CI parallelism, restart the runner or cancel queued jobs.
-- **Cloud over or down** (429, usage limit, timeout, blocked host): run 1-2 at a time, not 3-4. A PR check just waits for the server fallback; don't duplicate it. Ad hoc test runs go to the laptop only if the laptop is under its limits, else queue them and say "waiting on cloud" once.
-- **All three full**: finish in this order: production fixes, then merges, then everything else waits. Report once what is parked and why; don't retry on a timer.
-- Never fix overload by deleting things that serve users (volumes, images tagged for rollback, stopped product containers) or by touching Arena.
-
-## Disk hygiene (228GB laptop)
-- Remove your worktree the moment its PR merges (`git worktree remove <path>`). No `bun install` / `uv sync` / `npm i` in a throwaway worktree unless the task runs code there. Don't clone a repo just to read it (`gh api` / `gh repo view` / cloud routine). `~/bin/disk-maintenance.sh` runs daily (`restore <repo>` brings back an offloaded repo).
-
-## Routines (RemoteTrigger)
-- `list` returns 300KB+, `list_runs`/`get_run_log` ~10KB each: never poll in a loop; use `get` on one id or save to a file and summarise. No per-PR "re-check CI" routines; one watcher for all. Give routines an explicit model (Haiku watchers/status, Sonnet builds, Opus safety-critical review).
-- Booked routines are prompt SNAPSHOTS: when /red-team, /ship-check or a rule changes, re-template the pending ones in a small session.
+- Main chat defaults to Sonnet; Opus only for planning, review or a hard stretch, then back.
+- Unsure which tier: pick the cheaper one and escalate one tier only when the result is weak or the agent says it's unsure. Haiku briefs must be self-contained (files, change, how to verify).
+- Effort medium by default; `high` only when hard (unclear root cause, security/money/prod data). Never raise by habit.
+- Sub-agents work silently and return ONE result under 300 words; not for a 1-3 call lookup. Ad-hoc agents must pass `model:`. Fork only when the task needs this chat's context and context < ~60k.
+- Cloud first: work that can run in the cloud runs as a one-shot cloud routine; at most ONE local sub-agent at a time (8GB laptop).
 
 ## Keep context lean
-- No whole-file Reads of large files (ranges/grep); filter big output (head/jq/ctx_execute) and print only the answer; never re-read a file already in context.
-- Don't load connectors/plugins you don't need (Vercel, Everygen, Higgsfield, playwright MCP, sequential-thinking are removed; use CLIs: vercel/gh/supabase/`apify`/`playwright-cli`/`ctx7`). Keep MEMORY.md + rules short; detail goes in memory files.
+- No whole-file Reads of large files; filter big output and print only the answer. Don't load connectors you don't need; use CLIs (vercel/gh/supabase/apify/playwright-cli/ctx7).
+- Always-loaded rules have a word budget (`tests/learning/test_word_budget.py`); detail goes in skills or memory loaded on demand.
