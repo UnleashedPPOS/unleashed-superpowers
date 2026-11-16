@@ -24,6 +24,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 - autoCompactWindow is 250000 (founder 2026-10-17: chats normally sit ~250k, 200k felt too low); don't raise it. A repo's committed `.claude/settings.json` overrides the user value, so never commit a different number.
 
 ## Model + delegation
+- **Model policy (founder HARD RULE 2026-11-16): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** (11-16: two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time.
 - Main chats default to Sonnet; go Opus only for a genuinely hard stretch, then back. Main chat not on Opus stays orchestrator + straightforward edits; hard thinking goes to `opus-thinker`.
 - Use the agent files (`subagent_type` sets model + effort):
 
