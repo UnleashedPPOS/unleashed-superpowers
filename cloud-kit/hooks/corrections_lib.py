@@ -166,13 +166,13 @@ def fn_unverified_url(entry, text, ctx):
 
 
 # ---------------------------------------------------------------- status written in chat
-SECTION = re.compile(r"^\s*(?:#{1,6}\s*|[-*]\s+)?\**(Done|Remaining|Still open|Heads-up|Proof|Needs you|Change log)\b\**\s*:?", re.M)
+SECTION = re.compile(r"^[^\S\n]*(?:#{1,6}\s*|[-*]\s+)?\**(Done|Remaining|Still open|Heads-up|Proof|Needs you|Change log)\b\**\s*:?", re.M)
 
 
 def fn_status_in_chat(entry, text, ctx):
     if not ctx.get("page_published"):
         return None
-    if re.match(r"\s*\**\s*(?:STOP|NOT SHIPPABLE)\b", text or ""):
+    if re.match(r"\**[^\S\n]*(?:STOP|NOT SHIPPABLE)\b", (text or "").lstrip()):
         return None  # STOP / NOT SHIPPABLE are said in chat in full
     sections = {m.group(1) for m in SECTION.finditer(prose(text))}
     return ", ".join(sorted(sections)) if len(sections) >= 2 else None
@@ -181,8 +181,10 @@ def fn_status_in_chat(entry, text, ctx):
 # ---------------------------------------------------------------- more than one question
 def fn_multi_question(entry, text, ctx):
     body = URL.sub(" ", prose(text))
-    qs = re.findall(r"[^.!?\n]{3,}\?(?=\s|$)", body)
-    return f"{len(qs)} questions" if len(qs) > 1 else None
+    n = 0  # linear: split into sentences, never backtrack over a long unpunctuated run
+    for sentence in re.split(r"[.!\n]", body):
+        n += sum(1 for part in re.split(r"\?(?=\s|$)", sentence)[:-1] if len(part.strip()) >= 3)
+    return f"{n} questions" if n > 1 else None
 
 
 # ---------------------------------------------------------------- commit message format

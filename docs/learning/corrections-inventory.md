@@ -9,7 +9,7 @@ Every founder correction from the always-loaded rules and the High-Level output 
 - **eval**: behaviour a regex can't judge; a `claude plugin eval` case under `evals/`.
 - **prose**: judgement; stays as a rule line. The *Home* column is the one place it lives.
 
-Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded words: 3993.
+Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded word count: `python3 scripts/corrections.py words`.
 
 | ID | Rule | Class | Enforced by | Home | Source |
 |---|---|---|---|---|---|

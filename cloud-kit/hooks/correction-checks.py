@@ -85,6 +85,18 @@ def is_prompt(e):
     return not text_of(content).lstrip().startswith(NOT_A_PROMPT)
 
 
+def strings(value):
+    """Every string inside a tool input, unescaped (json.dumps would glue a backslash onto quoted URLs)."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from strings(v)
+
+
 def session_facts(entries):
     """URLs seen in tool calls/results, whether a status page exists, and the final reply text."""
     seen, page = set(), False
@@ -102,7 +114,8 @@ def session_facts(entries):
             for c in content:
                 if isinstance(c, dict) and c.get("type") == "tool_use":
                     inp = c.get("input") or {}
-                    seen.update(lib.URL.findall(json.dumps(inp)))
+                    for value in strings(inp):
+                        seen.update(lib.URL.findall(value))
                     if (c.get("name") == "Artifact" and inp.get("action", "publish") == "publish"
                             and not inp.get("asset") and "status" in os.path.basename(inp.get("file_path") or "").lower()):
                         page = True
@@ -197,8 +210,11 @@ def post_tool(payload):
                 hits = lib.evaluate("turn", text, {})
                 lib.log_hits(hits, "turn")
                 if hits:
-                    with open(sp, "w") as f:
-                        json.dump({"turn": marker}, f)
+                    try:
+                        with open(sp, "w") as f:
+                            json.dump({"turn": marker}, f)
+                    except OSError:
+                        pass  # keep the nudge even when the state dir is unwritable
                     notes.append(lib.describe(hits))
     if not notes:
         return None

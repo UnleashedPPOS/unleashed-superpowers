@@ -105,6 +105,23 @@ class EngineTest(TempHome):
                      "Due to time limits the tests are partial."):
             self.assertTrue(lib.evaluate("reply", text, {}, registry=[e]), text)
 
+    def test_reply_checks_are_linear_on_long_unpunctuated_text(self):
+        import time
+        for text in ("x" * 200000, "word " * 40000, "\n" * 50000, " " * 300000):
+            t = time.time()
+            lib.evaluate("reply", text, {"page_published": True, "seen_urls": set()})
+            self.assertLess(time.time() - t, 2.0, repr(text[:10]))
+
+    def test_multi_question_still_counts(self):
+        e = next(x for x in OWN if x["id"] == "multiple-questions-in-reply")
+        self.assertTrue(lib.evaluate("reply", "Should I use A? Or should I use B?", {}, registry=[e]))
+        self.assertFalse(lib.evaluate("reply", "Done. Want B too?", {}, registry=[e]))
+
+    def test_time_estimate_false_positives(self):
+        e = next(x for x in OWN if x["id"] == "time-estimate-in-reply")
+        for text in ("The eta field is null.", "That is a quick win.", "It is ~10 minutes slower than before."):
+            self.assertFalse(lib.evaluate("reply", text, {}, registry=[e]), text)
+
     def test_secret_detail_never_echoes_value(self):
         key = lib.expand_fakes("{{fake:anthropic}}")
         hits = lib.evaluate("reply", f"key: {key}", {})
@@ -193,6 +210,12 @@ class EventTest(TempHome):
         out = lib.describe([({"id": "x", "message": "m"}, "see https://h.example/p?token=abc123#frag")])
         self.assertNotIn("abc123", out)
         self.assertIn("https://h.example/p?", out)
+
+    def test_quoted_curl_url_counts_as_seen(self):
+        entries = [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash",
+                    "input": {"command": 'curl -s "https://docs.acme.io/setup" | head\nls'}}]}}]
+        seen, _ = hook.session_facts(entries)
+        self.assertIn("https://docs.acme.io/setup", seen)
 
     def test_pre_tool_agent_model(self):
         out = self.call({"hook_event_name": "PreToolUse", "tool_name": "Agent",

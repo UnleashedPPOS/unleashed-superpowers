@@ -79,7 +79,6 @@ def unclassified_memories(entries, memory_dir):
 
 def render_inventory(entries, memory_dir=None):
     counts = {k: sum(1 for e in entries if e["class"] == k) for k in ("check", "eval", "prose")}
-    _, per, total = word_count()
     out = [
         "# Corrections inventory",
         "",
@@ -93,7 +92,7 @@ def render_inventory(entries, memory_dir=None):
         "- **prose**: judgement; stays as a rule line. The *Home* column is the one place it lives.",
         "",
         f"Totals: {len(entries)} corrections; {counts['check']} checks, {counts['eval']} evals, {counts['prose']} prose. "
-        f"Always-loaded words: {total}.",
+        "Always-loaded word count: `python3 scripts/corrections.py words`.",
         "",
         "| ID | Rule | Class | Enforced by | Home | Source |",
         "|---|---|---|---|---|---|",
@@ -131,7 +130,10 @@ def render_unenforced(entries):
 
 def write_or_check(path, text, check):
     if check:
-        current = open(path).read() if os.path.exists(path) else ""
+        current = ""
+        if os.path.exists(path):
+            with open(path) as f:
+                current = f.read()
         if current != text:
             print(f"FAIL: {os.path.relpath(path, ROOT)} is stale; run scripts/corrections.py")
             return 1
@@ -153,7 +155,9 @@ def stale_facts(days):
     today = date.today()
     out = []
     for f in files:
-        for n, line in enumerate(open(f), 1):
+        with open(f) as fh:
+            lines = fh.readlines()
+        for n, line in enumerate(lines, 1):
             dates = DATE.findall(line)
             if not dates:
                 continue
@@ -166,17 +170,18 @@ def stale_facts(days):
 def prune(args):
     entries = load()
     checks = [e for e in entries if e["class"] == "check" and not e["check"].startswith("external:")]
-    fired, since = {}, None
+    fired = {}
     if os.path.exists(args.hits):
         cutoff = time.time() - args.days * 86400
-        for line in open(args.hits):
-            try:
-                row = json.loads(line)
-            except Exception:
-                continue
-            if row.get("ts", 0) >= cutoff:
-                fired[row["id"]] = fired.get(row["id"], 0) + 1
-                since = min(since or row["ts"], row["ts"])
+        with open(args.hits) as f:
+            for line in f:
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(row, dict) and row.get("id") and isinstance(row.get("ts", 0), (int, float)) \
+                        and row.get("ts", 0) >= cutoff:
+                    fired[row["id"]] = fired.get(row["id"], 0) + 1
     b, per, total = word_count()
     print(f"# Monthly prune report ({date.today()})\n")
     print(f"## Checks by hits in the last {args.days} days")

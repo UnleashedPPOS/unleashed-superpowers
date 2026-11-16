@@ -379,9 +379,11 @@
     "Unit tests ran in 3m19s.",
     "The last deploy took 4 minutes.",
     "CI went green about 20 minutes ago.",
-    "Touches 3 files and one migration."
+    "Touches 3 files and one migration.",
+    "The eta field is null.",
+    "It is ~10 minutes slower than before."
    ],
-   "pattern": "\\b(?:will|would|should|could|might|may|can|it'?ll)\\s+(?:only\\s+|probably\\s+|likely\\s+)?take\\s+(?:about\\s+|around\\s+|roughly\\s+|~\\s*|under\\s+|less than\\s+)?(?:\\d+|a few|a couple of|an?|several|half an?)\\s*(?:-\\s*\\d+\\s*)?(?:sec|second|min|minute|hour|hr|day|week|month)s?\\b|\\btakes?\\s+(?:about|around|roughly|~)\\s*\\d+\\s*(?:sec|second|min|minute|hour|hr|day|week)s?\\b|(?:~|\\babout\\s|\\baround\\s|\\broughly\\s)\\s*\\d+(?:\\s*-\\s*\\d+)?\\s*(?:min|minute|hour|hr|day|week)s?\\b(?!\\s+ago)|\\bETA\\b|\\b\\d+\\s*(?:hours?|days?|weeks?)\\s+of\\s+(?:work|effort|dev)|\\bwon'?t\\s+take\\s+long\\b|\\bquick\\s+win\\b|\\b(?:should|will)\\s+be\\s+(?:done|ready|finished)\\s+(?:in|within)\\s+(?:about\\s+)?(?:\\d+|an?|a few)\\s*(?:min|minute|hour|hr|day|week)"
+   "pattern": "\\b(?:will|would|should|could|might|may|can|it'?ll)\\s+(?:only\\s+|probably\\s+|likely\\s+)?take\\s+(?:about\\s+|around\\s+|roughly\\s+|~\\s*|under\\s+|less than\\s+)?(?:\\d+|a few|a couple of|an?|several|half an?)\\s*(?:-\\s*\\d+\\s*)?(?:sec|second|min|minute|hour|hr|day|week|month)s?\\b|\\btakes?\\s+(?:about|around|roughly|~)\\s*\\d+\\s*(?:sec|second|min|minute|hour|hr|day|week)s?\\b|(?:~|\\babout\\s|\\baround\\s|\\broughly\\s)\\s*\\d+(?:\\s*-\\s*\\d+)?\\s*(?:min|minute|hour|hr|day|week)s?\\b(?!\\s+(?:ago|slower|faster|later than|earlier than))|(?-i:\\bETA\\b)|\\b\\d+\\s*(?:hours?|days?|weeks?)\\s+of\\s+(?:work|effort|dev)|\\bwon'?t\\s+take\\s+long\\b|\\b(?:should|will)\\s+be\\s+(?:done|ready|finished)\\s+(?:in|within)\\s+(?:about\\s+)?(?:\\d+|an?|a few)\\s*(?:min|minute|hour|hr|day|week)"
   },
   {
    "id": "unverified-url-in-reply",
