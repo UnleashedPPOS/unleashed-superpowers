@@ -7,7 +7,7 @@
    "source": "rules/credential-handoffs.md + system 'never print secrets'",
    "class": "check",
    "home": "cloud-kit/rules/user-handoffs.md",
-   "anchor": "never echo, commit or repeat them",
+   "anchor": "put a credential in a command or file",
    "surface": [
     "bash",
     "write"
@@ -41,7 +41,8 @@
      "path": ".env.example",
      "text": "OPENROUTER_API_KEY=your_key_here"
     }
-   ]
+   ],
+   "no_override": true
   },
   {
    "id": "secret-in-reply",
@@ -61,7 +62,8 @@
    "good": [
     "Stored as GROQ_API_KEY in the vault.",
     "Test login is in the vault as TEST_UNLEASHEDOS_MEMBER_PASSWORD."
-   ]
+   ],
+   "no_override": true
   },
   {
    "id": "secret-pasted-in-prompt",
@@ -122,7 +124,8 @@
      "path": "/home/u/Developer/leadgen/src/llm.ts",
      "text": "if (process.env.LLM_ALLOW_OPENROUTER === '1') hops.push(openrouter)"
     }
-   ]
+   ],
+   "no_override": true
   },
   {
    "id": "banned-llm-provider",
@@ -284,7 +287,7 @@
    "source": "rules/openrouter-os-mobile-only.md ('never print the key') + system rule",
    "class": "check",
    "home": "cloud-kit/rules/user-handoffs.md",
-   "anchor": "never echo",
+   "anchor": "Never print a secret",
    "surface": "bash",
    "action": "block",
    "check": "regex",
@@ -302,7 +305,8 @@
     "echo $PATH"
    ],
    "pattern": "\\bvault\\s+get\\b(?![^\\n]*\\|)|\\becho\\s+[\\\"']?\\$\\{?\\w*(?:KEY|TOKEN|SECRET|PASSWORD)\\w*|\\bprintenv\\s+\\w*(?:KEY|TOKEN|SECRET|PASSWORD)|(?:^|[;&|]\\s*)(?:printenv|env)\\s*(?:$|\\|)|\\bcat\\s+[^\\n;&|]*\\.env\\b(?!\\.example|\\.sample|\\.template)",
-   "flags": "m"
+   "flags": "m",
+   "no_override": true
   },
   {
    "id": "test-account-delete",
@@ -332,7 +336,8 @@
      "text": "await resetJournal('qa+os-member@unleashed.vision')"
     }
    ],
-   "pattern": "(?:\\bdelete\\b|soft[_-]?delete|deleted_at|deleteUser|\\bremove\\b)[^\\n]{0,200}qa\\+[\\w.%*-]*@|qa\\+[\\w.%*-]*@[^\\n]{0,200}(?:\\bdelete\\b|soft[_-]?delete|deleted_at\\s*=|deleteUser)"
+   "pattern": "(?:\\bdelete\\b|soft[_-]?delete|deleted_at|deleteUser|\\bremove\\b)[^\\n]{0,200}qa\\+[\\w.%*-]*@|qa\\+[\\w.%*-]*@[^\\n]{0,200}(?:\\bdelete\\b|soft[_-]?delete|deleted_at\\s*=|deleteUser)",
+   "no_override": true
   },
   {
    "id": "commit-message-format",
@@ -485,8 +490,8 @@
    "rule": "At most one question per turn.",
    "source": "rules/working-style.md + output style",
    "class": "check",
-   "home": "cloud-kit/rules/working-style.md",
-   "anchor": "At most ONE question per turn ✓",
+   "home": "output-styles/high-level.md",
+   "anchor": "Ask at most one question per turn",
    "surface": "reply",
    "action": "block",
    "check": "fn:multi_question",
@@ -513,13 +518,15 @@
    "bad": [
     "Core flow done; settings screen in a follow-up PR.",
     "Shipped the MVP of the importer.",
-    "I'm keeping the session small, so the rest is parked until later."
+    "I'm keeping the session small, so the rest is parked until later.",
+    "Given time constraints, I skipped the docs.",
+    "I scoped it down to the API only."
    ],
    "good": [
     "Built the core flow and the settings screen.",
     "Remaining: blocked on Apple review (needs you)."
    ],
-   "pattern": "(?i:\\bphase\\s*(?:2|two|ii)\\b|\\bfollow-?up PR\\b|\\bin a (?:later|future|separate|follow-?up) (?:PR|pass|session|chat|iteration)\\b|\\bkeep(?:ing)? (?:the|this) (?:session|chat|context) (?:small|lean|short)\\b|\\b(?:left|parked|deferred|saved) (?:for|until) later\\b|\\bout of scope for now\\b)|\\bMVP\\b",
+   "pattern": "(?i:\\bphase\\s*(?:2|two|ii)\\b|\\bfollow-?up PR\\b|\\bin a (?:later|future|separate|follow-?up) (?:PR|pass|session|chat|iteration)\\b|\\bkeep(?:ing)? (?:the|this) (?:session|chat|context) (?:small|lean|short)\\b|\\b(?:left|parked|deferred|saved) (?:for|until) later\\b|\\bout of scope for now\\b|\\b(?:given|due to|because of) (?:the )?(?:time|effort) (?:constraints?|limits?|budget)\\b|\\bscop(?:ed|ing) (?:it |this |the \\w+ )?down\\b)|\\bMVP\\b",
    "flags": ""
   },
   {
@@ -611,7 +618,7 @@
    "source": "output-styles/high-level.md (founder 2026-10-15)",
    "class": "check",
    "home": "output-styles/high-level.md",
-   "anchor": "No narration",
+   "anchor": "No narration. No \"Let me…\"",
    "surface": "turn",
    "action": "warn",
    "check": "fn:narration",
@@ -697,15 +704,6 @@
    "check": "external:same check: permission-question-in-reply"
   },
   {
-   "id": "status-on-page-rule",
-   "rule": "Status goes on the page; no narration while working.",
-   "source": "rules/working-style.md",
-   "class": "check",
-   "home": "cloud-kit/rules/working-style.md",
-   "anchor": "Status goes on the page, not in chat ✓",
-   "check": "external:same check: status-in-chat, narration-while-working"
-  },
-  {
    "id": "no-secrets-in-commits",
    "rule": "No secrets in commits.",
    "source": "rules/git-workflow.md",
@@ -783,7 +781,7 @@
    "source": "skills/session-handoff",
    "class": "eval",
    "home": "skills/session-handoff/SKILL.md",
-   "anchor": "carried forward, never dropped",
+   "anchor": "never drop a not-done item",
    "eval": "evals/session-handoff-carries-items"
   },
   {
@@ -792,7 +790,7 @@
    "source": "brief 2026-11-16 item 3",
    "class": "eval",
    "home": "commands/learnings.md",
-   "anchor": "one step",
+   "anchor": "a correction becomes a check, in one step",
    "eval": "evals/learnings-correction-to-check"
   },
   {
@@ -826,7 +824,7 @@
    "source": "rules/working-style.md",
    "class": "prose",
    "home": "cloud-kit/rules/working-style.md",
-   "anchor": "One short ordered \"only you can do\" list"
+   "anchor": "One short ordered Needs you list"
   },
   {
    "id": "merge-yourself",
@@ -962,7 +960,7 @@
    "source": "rules/token-discipline.md (founder HARD RULE 2026-11-16: two lanes died on the weekly Fable limit)",
    "class": "check",
    "home": "cloud-kit/rules/token-discipline.md",
-   "anchor": "NEVER Fable",
+   "anchor": "NEVER Fable (`claude-fable-5-2`)",
    "surface": [
     "agent",
     "write"
@@ -989,7 +987,8 @@
      "path": "/r/kit/cloud-kit/agents/builder.md",
      "text": "---\nname: builder\nmodel: sonnet\n---\nNever use Fable here.\n"
     }
-   ]
+   ],
+   "no_override": true
   },
   {
    "id": "subagent-budget",
@@ -1037,7 +1036,7 @@
    "source": "rules/token-discipline.md",
    "class": "prose",
    "home": "cloud-kit/rules/token-discipline.md",
-   "anchor": "Cloud first"
+   "anchor": "Cloud first: work that can run in the cloud"
   },
   {
    "id": "lean-context",
@@ -1061,7 +1060,7 @@
    "source": "skills/where-work-runs/SKILL.md",
    "class": "prose",
    "home": "skills/where-work-runs/SKILL.md",
-   "anchor": "Never fix overload by deleting"
+   "anchor": "Never fix overload by deleting volumes"
   },
   {
    "id": "no-ci-parallelism",
@@ -1157,7 +1156,7 @@
    "source": "skills/llm-provider-chain/SKILL.md",
    "class": "prose",
    "home": "skills/llm-provider-chain/SKILL.md",
-   "anchor": "Migration routine"
+   "anchor": "## Migration routine (moving a repo off OpenRouter"
   },
   {
    "id": "no-self-drive-credentials",

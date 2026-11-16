@@ -7,4 +7,5 @@
 - Where it goes: the status page's Needs you; chat only when there is no page or it is this turn's one question. (Replaces the old "in chat, not a doc" line, which predates status pages.)
 - After the founder pastes, do every downstream step yourself: wiring, deploy, verification. Never punt steps back.
 - Pasted credentials: store with `vault set`; never echo, commit or repeat them ✓.
+- Never print a secret (`vault get`, `printenv`, `cat .env`) or put a credential in a command or file; use `vault run` ✓.
 - Deep-link patterns (Slack webhook, Supabase, Vercel, GitHub secrets, Stripe) and the full hand-off format: skill `founder-handoffs`.

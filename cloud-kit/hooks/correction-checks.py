@@ -168,7 +168,8 @@ def pre_tool(payload):
         return None
     decision = "deny" if any(e.get("action") == "block" for e, _ in hits) else "ask"
     reason = ("[correction-check] This call repeats a mistake the founder has corrected before:\n" + lib.describe(hits) +
-              "\nFix the call. Only if this case is genuinely fine, add `correction-ok: <id>` to the command or text.")
+              "\nFix the call. Only if this case is genuinely fine, add `correction-ok: <id>` to the command or text; "
+              "safety checks (secrets, OpenRouter, test accounts, Fable) can't be overridden: stop and tell the founder.")
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": decision,
                                    "permissionDecisionReason": reason}}
 

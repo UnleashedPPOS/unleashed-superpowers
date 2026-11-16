@@ -1,6 +1,6 @@
 ---
 name: llm-provider-chain
-description: "Detail behind the always-loaded LLM provider rule: Bedrock, Groq and Anthropic endpoints, model ids, gpt-oss and Haiku request quirks, cheapest-model eval rule, OpenRouter spend checks and the repo-migration routine. Use when adding, changing or reviewing any LLM call, choosing a model, writing an LLM helper or failover, moving a repo off OpenRouter, checking OpenRouter spend, or when the words Bedrock, Groq, gpt-oss, OpenRouter, provider chain, failover or LLM_ALLOW_OPENROUTER come up. SKIP for embeddings work beyond the 'never change the model' line."
+description: "Detail behind the always-loaded LLM provider rule: Bedrock, Groq and Anthropic endpoints, model ids, gpt-oss and Haiku request quirks, cheapest-model eval rule, OpenRouter spend checks and the repo-migration routine. Use when adding, changing or reviewing any LLM call, choosing a model, writing an LLM helper or failover, moving a repo off OpenRouter, checking OpenRouter spend, or when the words Bedrock, Groq, gpt-oss, OpenRouter, provider chain, failover or LLM_ALLOW_OPENROUTER come up. SKIP for embeddings work: never change an embeddings model, and embeddings already on OpenRouter stay there and get reported."
 ---
 
 # LLM provider chain (detail)

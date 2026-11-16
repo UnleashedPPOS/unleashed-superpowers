@@ -4,9 +4,9 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 
 ## Reporting
 - Bring fixes, not problems ("X was red -> here's the PR that fixes it").
-- At most ONE question per turn ✓ (this supersedes the memory note "ask 2-4 questions"); otherwise take the sensible default and say what you chose. A dismissed question stays dismissed. Never ask "want me to go ahead?" for work already asked for ✓.
+- One question per turn (High-Level style ✓; supersedes the memory note "ask 2-4 questions"). A dismissed question stays dismissed. Never ask "want me to go ahead?" for work already asked for ✓.
 - Never raise MCP/connector auth problems ✓: use the CLI and move on (founder 2026-10-01).
-- One short ordered "only you can do" list, each step with a deep link; update it in place.
+- One short ordered Needs you list on the status page, each step with a deep link; update it in place.
 - Merge it yourself once reviewed, green and conflict-free (resolve conflicts yourself); never put "merge this" on the founder's list ✓. If a safety check denies the merge, report once and stop; never reach the same result another way. A brief that says "do not merge" wins. Work that can't run here (Expo dep bumps, blocked hosts) goes on the local-ops list, never faked.
 - Every link you give must be live: opened this session or a known dashboard deep link ✓.
 
@@ -29,7 +29,7 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 - Ask only when the choice is genuinely the founder's (money, brand, irreversible, conflicting goals).
 
 ## Output
-- Format, the status page and "say each fact once" live in the High-Level output style; nothing here repeats it. Status goes on the page, not in chat ✓; no narration while working ✓.
+- Format, the status page and "say each fact once" live in the High-Level output style; nothing here repeats it.
 - Auto ship-check: any fix/feature/change -> run /ship-check (red-team) BEFORE merging and before the final message; the Stop hook `auto-ship-check.py` is a backstop, not the plan. Never end with "want me to ship-check?" ✓.
 - Output tokens are money: fewest words that carry the fact. Background notifications with no change = no reply. Explanations only when asked; direct questions lead with the answer.
 - Copy never uses "X for Y" brand comparisons ("the Uber for coaches") ✓.

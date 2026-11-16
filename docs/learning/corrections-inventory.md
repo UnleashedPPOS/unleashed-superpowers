@@ -9,7 +9,7 @@ Every founder correction from the always-loaded rules and the High-Level output 
 - **eval**: behaviour a regex can't judge; a `claude plugin eval` case under `evals/`.
 - **prose**: judgement; stays as a rule line. The *Home* column is the one place it lives.
 
-Totals: 103 corrections; 35 checks, 9 evals, 59 prose. Always-loaded words: 3886.
+Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded words: 3993.
 
 | ID | Rule | Class | Enforced by | Home | Source |
 |---|---|---|---|---|---|
@@ -38,13 +38,12 @@ Totals: 103 corrections; 35 checks, 9 evals, 59 prose. Always-loaded words: 3886
 | `deferral-in-reply` | Build all of it: no phase 2, follow-up PRs, MVP or 'keeping the session small'. | check | `deferral-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md + rules/token-discipline.md (HARD RULE 2026-10-08) |
 | `empty-commit-ci-restart` | Never push or empty-commit just to restart checks. | check | `empty-commit-ci-restart` (bash → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md CI |
 | `merge-on-founder-list` | Never put "merge this" on the founder's list; merge it yourself when green. | check | `merge-on-founder-list` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md |
-| `multiple-questions-in-reply` | At most one question per turn. | check | `multiple-questions-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md + output style |
 | `no-ship-check-offer` | Never end with 'want me to ship-check?'. | check | same check: permission-question-in-reply | `cloud-kit/rules/working-style.md` | rules/working-style.md |
 | `no-time-as-reason` | Never use time or effort as a reason to shrink, phase, defer or ask permission. | check | same check: deferral-in-reply, permission-question-in-reply | `cloud-kit/rules/working-style.md` | rules/working-style.md |
 | `permission-question-in-reply` | Never ask permission for work already asked for (incl. "want me to ship-check?"). | check | `permission-question-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md (2026-10-08) + Output |
-| `status-on-page-rule` | Status goes on the page; no narration while working. | check | same check: status-in-chat, narration-while-working | `cloud-kit/rules/working-style.md` | rules/working-style.md |
 | `time-estimate-in-reply` | Never estimate duration. | check | `time-estimate-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md (HARD RULE 2026-10-08) |
 | `unverified-url-in-reply` | Every link given must be live: opened this session or a known dashboard deep link. | check | `unverified-url-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/user-handoffs.md §3/§6 + brief 'linking an un-live URL' |
+| `multiple-questions-in-reply` | At most one question per turn. | check | `multiple-questions-in-reply` (reply → block) | `output-styles/high-level.md` | rules/working-style.md + output style |
 | `narration-while-working` | No narration while working: zero chat text between tool calls. | check | `narration-while-working` (turn → warn) | `output-styles/high-level.md` | output-styles/high-level.md (founder 2026-10-15) |
 | `status-in-chat` | Once a status page exists, status goes only on the page, not in chat. | check | `status-in-chat` (reply → block) | `output-styles/high-level.md` | output-styles/high-level.md (HARD RULE 2026-10-10) + brief |
 | `status-page-heartbeat` | Long work republishes the status page about every 30 min. | check | cloud-kit/hooks/status-page-heartbeat.py | `output-styles/high-level.md` | output-styles/high-level.md |

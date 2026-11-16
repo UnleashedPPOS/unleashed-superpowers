@@ -88,6 +88,23 @@ class EngineTest(TempHome):
         self.assertFalse(lib.evaluate("bash", "git commit --allow-empty -m x  # correction-ok: empty-commit-ci-restart",
                                       {}, registry=[e]))
 
+    def test_safety_checks_cannot_be_overridden(self):
+        safety = {"secret-in-tool-input", "print-secret", "openrouter-outside-os", "test-account-delete",
+                  "never-fable-subagent"}
+        for e in OWN:
+            if e["id"] in safety:
+                self.assertTrue(e.get("no_override"), e["id"])
+        e = next(x for x in OWN if x["id"] == "test-account-delete")
+        bad = lib.expand_fakes(e["bad"][0]) if isinstance(e["bad"], list) else e["bad"]
+        self.assertTrue(lib.evaluate(e["surface"][0] if isinstance(e["surface"], list) else e["surface"],
+                                     bad + "\n# correction-ok: test-account-delete", {}, registry=[e]))
+
+    def test_deferral_catches_time_excuses(self):
+        e = next(x for x in OWN if x["id"] == "deferral-in-reply")
+        for text in ("Given time constraints, I skipped the docs.", "I scoped it down to the API only.",
+                     "Due to time limits the tests are partial."):
+            self.assertTrue(lib.evaluate("reply", text, {}, registry=[e]), text)
+
     def test_secret_detail_never_echoes_value(self):
         key = lib.expand_fakes("{{fake:anthropic}}")
         hits = lib.evaluate("reply", f"key: {key}", {})

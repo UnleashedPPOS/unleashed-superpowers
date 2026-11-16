@@ -257,8 +257,8 @@ def applies(entry, surface, ctx):
 def match(entry, text, ctx):
     """Short detail string when the check fires, else None."""
     text = text or ""
-    if re.search(r"correction-ok:\s*" + re.escape(entry["id"]) + r"\b", text):
-        return None
+    if not entry.get("no_override") and re.search(r"correction-ok:\s*" + re.escape(entry["id"]) + r"\b", text):
+        return None  # safety checks (no_override) can't be waved through
     check = entry.get("check", "regex")
     if check.startswith("fn:"):
         return FUNCTIONS[check[3:]](entry, text, ctx)

@@ -37,7 +37,11 @@ class Registry(unittest.TestCase):
         for e in self.entries:
             path = os.path.join(ROOT, e["home"])
             self.assertTrue(os.path.exists(path), f"{e['id']}: home {e['home']} missing")
-            self.assertIn(e["anchor"].lower(), open(path).read().lower(), f"{e['id']}: anchor not in {e['home']}")
+            with open(path) as f:
+                text = f.read()
+            body = re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.S)  # frontmatter doesn't count
+            self.assertTrue(e["anchor"].lower() in body.lower(), f"{e['id']}: anchor not in the body of {e['home']}")
+            self.assertGreaterEqual(len(e["anchor"]), 12, f"{e['id']}: anchor too vague to pin one line")
 
     def test_external_checks_exist(self):
         ids = {e["id"] for e in self.entries}
