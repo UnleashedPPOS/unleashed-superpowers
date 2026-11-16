@@ -25,6 +25,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Week of
 
 ## Model + delegation
 - **Model policy (founder HARD RULE 2026-11-16): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** (11-16: two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time.
+- **Sub-agent budget (founder 2026-11-16, "you be the CFO"):** each sub-agent is a fresh context start. A lane or chat does its own build; at most 3 sub-agents per lane/chat unless the work truly splits into independent slices; reuse one via SendMessage for follow-up rounds instead of spawning new ones. Every lane prompt states its cap.
 - Main chats default to Sonnet; go Opus only for a genuinely hard stretch, then back. Main chat not on Opus stays orchestrator + straightforward edits; hard thinking goes to `opus-thinker`.
 - Use the agent files (`subagent_type` sets model + effort):
 
