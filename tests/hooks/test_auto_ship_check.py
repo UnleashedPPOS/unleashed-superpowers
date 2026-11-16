@@ -152,6 +152,13 @@ class HookTest(unittest.TestCase):
         self.assertIn("Prose-only", self.run_hook()["reason"])
 
     def test_edit_tool_ts_and_py_block(self):
+        # The fixture repos live under the system temp dir, which the hook skips as scratch space
+        # (/tmp on Linux, /var/folders on macOS); drop those prefixes so the edits count.
+        prefixes = tuple(p for p in hook.SKIP_PREFIXES if not p.startswith(("/tmp/", "/private/tmp/", "/var/folders/")))
+        with mock.patch.object(hook, "SKIP_PREFIXES", prefixes):
+            self._edit_tool_ts_and_py_block()
+
+    def _edit_tool_ts_and_py_block(self):
         for fp in (os.path.join(self.app, "src", "a.ts"), os.path.join(self.um, "bin", "x.py")):
             self.entries = self.entries[:1]
             self.tool("Edit", {"file_path": fp, "old_string": "a", "new_string": "b"})

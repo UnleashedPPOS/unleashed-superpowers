@@ -58,6 +58,18 @@ if [ -f "$list" ]; then
 fi
 printf '%s' "$installed" > "$list"
 
+# Rules merged or retired upstream (cloud-kit/RETIRED) are moved out of the always-loaded set,
+# never deleted: they land in ~/.claude/.retired-rules/ so the change is reversible.
+if retired=$(fetch cloud-kit/RETIRED); then
+  while IFS= read -r name; do
+    case "$name" in ''|'#'*|*/*|.*) continue ;; esac
+    if [ -f "$CL/rules/$name" ]; then
+      mkdir -p "$CL/.retired-rules"
+      mv -f "$CL/rules/$name" "$CL/.retired-rules/$name"
+    fi
+  done <<< "$retired"
+fi
+
 python3 - "$CL" "$RAW" <<'PY' || echo "cloud-kit: settings.json left untouched" >&2
 import json, os, sys, tempfile
 cl, raw = sys.argv[1], sys.argv[2]
@@ -93,6 +105,9 @@ ensure("PostToolUse", "/.claude/hooks/context-size-nudge.py", f'"{cl}/hooks/cont
 ensure("PostToolUse", "/.claude/hooks/serial-call-nudge.py", f'"{cl}/hooks/serial-call-nudge.py"', timeout=10)
 ensure("PostToolUse", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
 ensure("Stop", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
+# Founder corrections enforced as checks (registry: hooks/corrections.json); one script, four events.
+for ev in ("PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit"):
+    ensure(ev, "/.claude/hooks/correction-checks.py", f'"{cl}/hooks/correction-checks.py"', timeout=10)
 ensure("SessionStart", "/cloud-kit/install.sh | bash", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
        timeout=600, **{"async": True})
 fd, tmp = tempfile.mkstemp(dir=cl, prefix=".settings.")
