@@ -7,6 +7,7 @@ cloud-kit/hooks/context-size-nudge.py
 cloud-kit/hooks/correction-checks.py
 cloud-kit/hooks/corrections.json
 cloud-kit/hooks/corrections_lib.py
+cloud-kit/hooks/model-guard.py
 cloud-kit/hooks/serial-call-nudge.py
 cloud-kit/hooks/status-page-heartbeat.py
 cloud-kit/rules/git-workflow.md

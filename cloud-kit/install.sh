@@ -90,7 +90,7 @@ if s.get("autoCompactWindow") in (None, 200000):
 s.setdefault("env", {}).setdefault("CLAUDE_CODE_SUBAGENT_MODEL", "sonnet")
 hooks = s.setdefault("hooks", {})
 
-def ensure(event, key, command, **extra):
+def ensure(event, key, command, matcher=None, **extra):
     """One kit hook per key: replace an earlier version in place, else append."""
     hook = dict(type="command", command=command, **extra)
     arr = hooks.setdefault(event, [])
@@ -98,8 +98,10 @@ def ensure(event, key, command, **extra):
         for i, h in enumerate(m.get("hooks", [])):
             if key in str(h.get("command", "")):
                 m["hooks"][i] = hook
+                if matcher:
+                    m["matcher"] = matcher
                 return
-    arr.append({"hooks": [hook]})
+    arr.append({"matcher": matcher, "hooks": [hook]} if matcher else {"hooks": [hook]})
 
 ensure("Stop", "/.claude/hooks/auto-ship-check.py", f'"{cl}/hooks/auto-ship-check.py"', timeout=10)
 ensure("PostToolUse", "/.claude/hooks/context-size-nudge.py", f'"{cl}/hooks/context-size-nudge.py"', timeout=10)
@@ -109,6 +111,8 @@ ensure("Stop", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-p
 # Founder corrections enforced as checks (registry: hooks/corrections.json); one script, four events.
 for ev in ("PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit"):
     ensure(ev, "/.claude/hooks/correction-checks.py", f'"{cl}/hooks/correction-checks.py"', timeout=10)
+ensure("PreToolUse", "/.claude/hooks/model-guard.py", f'"{cl}/hooks/model-guard.py"',
+       matcher="Agent|Task|RemoteTrigger|Workflow|mcp__ccd_session__start_session|mcp__scheduled-tasks__.*", timeout=10)
 ensure("SessionStart", "/cloud-kit/install.sh | bash", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
        timeout=600, **{"async": True})
 fd, tmp = tempfile.mkstemp(dir=cl, prefix=".settings.")

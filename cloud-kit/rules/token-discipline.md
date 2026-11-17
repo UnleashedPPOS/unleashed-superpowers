@@ -17,7 +17,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Levers:
 - autoCompactWindow is 250000; don't raise it, and never commit a different number in a repo's `.claude/settings.json` ✓.
 
 ## Models and delegation (the one model table)
-- **Model policy (founder HARD RULE 2026-11-16, newest; supersedes memory "Build in Fable"): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** ✓ (two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time.
+- **Model policy (founder HARD RULE 2026-11-16, newest; supersedes memory "Build in Fable"): plan in Opus -> build in Sonnet (Haiku for fully specified mechanical work) -> review + ship-check in Opus. NEVER Fable (`claude-fable-5-2`) for lanes, routines or sub-agents** ✓ (two lanes died on the weekly Fable limit). Every build routine gets a matching Opus review routine booked at the same time. Enforced by `hooks/model-guard.py` (PreToolUse): Fable, a routine with no model, a non-Opus review routine, or a routine prompt with no sub-agent cap is denied.
 - **Sub-agent budget ("you be the CFO"):** each sub-agent is a fresh context start (~40k). A lane or chat does its own build; at most 3 sub-agents per lane/chat unless the work truly splits into independent slices; reuse one via SendMessage for follow-up rounds. Every lane prompt states its cap.
 
 | Agent | Model | Use for |
