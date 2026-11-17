@@ -1,0 +1,1316 @@
+{
+ "version": 1,
+ "corrections": [
+  {
+   "id": "secret-in-tool-input",
+   "rule": "Never put a credential in a command or a file.",
+   "source": "rules/credential-handoffs.md + system 'never print secrets'",
+   "class": "check",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "put a credential in a command or file",
+   "surface": [
+    "bash",
+    "write"
+   ],
+   "action": "block",
+   "check": "fn:secret",
+   "message": "A credential is in this command or file. Reference it from the vault/env instead (`vault run`, `$NAME`), never inline.",
+   "bad": [
+    "curl -H 'x-api-key: {{fake:anthropic}}' https://api.anthropic.com/v1/messages",
+    {
+     "path": "src/lib/llm.ts",
+     "text": "const KEY = '{{fake:openrouter}}';"
+    },
+    {
+     "path": "scripts/deploy.sh",
+     "text": "export AWS_ACCESS_KEY_ID={{fake:aws}}"
+    },
+    {
+     "path": "supabase/functions/x/index.ts",
+     "text": "const admin = createClient(url, '{{fake:service-jwt}}')"
+    }
+   ],
+   "good": [
+    "curl -H \"x-api-key: $ANTHROPIC_API_KEY\" https://api.anthropic.com/v1/messages",
+    "vault set GROQ_API_KEY {{fake:groq}}",
+    {
+     "path": "src/lib/supabase.ts",
+     "text": "const anon = '{{fake:anon-jwt}}';"
+    },
+    {
+     "path": ".env.example",
+     "text": "OPENROUTER_API_KEY=your_key_here"
+    }
+   ],
+   "no_override": true
+  },
+  {
+   "id": "secret-in-reply",
+   "rule": "Never repeat a credential or test password in chat.",
+   "source": "rules/test-accounts.md + rules/credential-handoffs.md",
+   "class": "check",
+   "home": "cloud-kit/rules/test-accounts.md",
+   "anchor": "Never put test passwords in chat",
+   "surface": "reply",
+   "action": "block",
+   "check": "fn:secret",
+   "message": "The reply contains a credential. Remove it; say where it is stored instead.",
+   "bad": [
+    "Stored. For reference the key is {{fake:groq}}.",
+    "Log in with password: \"Sunrise2026!\""
+   ],
+   "good": [
+    "Stored as GROQ_API_KEY in the vault.",
+    "Test login is in the vault as TEST_UNLEASHEDOS_MEMBER_PASSWORD."
+   ],
+   "no_override": true
+  },
+  {
+   "id": "secret-pasted-in-prompt",
+   "rule": "A credential pasted in chat goes straight to the vault, never echoed.",
+   "source": "rules/credential-handoffs.md",
+   "class": "check",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Pasted credentials",
+   "surface": "prompt",
+   "action": "context",
+   "check": "fn:secret",
+   "message": "The founder pasted a credential. Store it with `vault set <NAME>`, never echo, log or commit it, and ask once whether to rotate it since it now sits in the transcript.",
+   "bad": [
+    "here you go {{fake:anthropic}}",
+    "github token {{fake:github}}"
+   ],
+   "good": [
+    "the key is in the vault as ANTHROPIC_API_KEY",
+    "use the anon key, it's public"
+   ]
+  },
+  {
+   "id": "openrouter-outside-os",
+   "rule": "OpenRouter is for the OS mobile app only; no other code, script or test calls it.",
+   "source": "rules/openrouter-os-mobile-only.md (founder 2026-11-11)",
+   "class": "check",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "OpenRouter is reserved for the live Unleashed OS mobile app",
+   "surface": [
+    "bash",
+    "write"
+   ],
+   "action": "block",
+   "check": "fn:openrouter_outside_os",
+   "message": "OpenRouter outside the OS mobile app. Use the Bedrock → Groq → Anthropic chain (skill `llm-provider-chain`).",
+   "bad": [
+    "curl https://openrouter.ai/api/v1/chat/completions -H \"Authorization: Bearer $OPENROUTER_API_KEY\" -d @body.json",
+    {
+     "path": "/home/u/Developer/leadgen/src/llm.ts",
+     "text": "const r = await fetch('https://openrouter.ai/api/v1/chat/completions', opts)"
+    },
+    {
+     "path": "/home/u/Developer/factory/scripts/run.py",
+     "text": "key = os.environ['OPENROUTER_API_KEY']"
+    }
+   ],
+   "good": [
+    "vault run -- curl -s https://openrouter.ai/api/v1/credits",
+    {
+     "path": "/home/u/Developer/unleashedos/supabase/functions/coach/llm.ts",
+     "text": "const OR = 'https://openrouter.ai/api/v1/chat/completions'"
+    },
+    {
+     "path": "/home/u/Developer/leadgen/docs/llm.md",
+     "text": "We no longer call openrouter.ai/api from here."
+    },
+    {
+     "path": "/home/u/Developer/leadgen/src/llm.ts",
+     "text": "if (process.env.LLM_ALLOW_OPENROUTER === '1') hops.push(openrouter)"
+    }
+   ],
+   "no_override": true
+  },
+  {
+   "id": "banned-llm-provider",
+   "rule": "Never Cerebras, Fireworks, DeepSeek direct or Gemini.",
+   "source": "rules/llm-provider-chain.md (2026-11-11)",
+   "class": "check",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "Never Cerebras, Fireworks, DeepSeek direct or Gemini",
+   "surface": [
+    "bash",
+    "write"
+   ],
+   "action": "block",
+   "check": "regex",
+   "message": "This provider is out of credit or ruled out by the founder. Use Bedrock → Groq → Anthropic.",
+   "bad": [
+    "curl https://api.deepseek.com/v1/chat/completions -d @b.json",
+    {
+     "path": "src/llm/providers.ts",
+     "text": "const key = process.env.GEMINI_API_KEY"
+    }
+   ],
+   "good": [
+    "grep -rn DEEPSEEK_API_KEY src/",
+    {
+     "path": "docs/providers.md",
+     "text": "We dropped api.cerebras.ai in November."
+    },
+    {
+     "path": "src/llm/providers.ts",
+     "text": "const key = process.env.BEDROCK_API_KEY"
+    }
+   ],
+   "pattern": "api\\.cerebras\\.ai|api\\.fireworks\\.ai|api\\.deepseek\\.com|generativelanguage\\.googleapis\\.com|\\b(?:GEMINI|GOOGLE_GENAI|CEREBRAS|FIREWORKS|DEEPSEEK)_API_KEY\\b",
+   "flags": "",
+   "unless": "^\\s*(?:rg|grep|git\\s+(?:grep|log)|find)\\b",
+   "skip_paths": "\\.(?:md|mdx|txt|rst)$|(?:^|/)(?:tests?|__tests__|fixtures)/"
+  },
+  {
+   "id": "brand-x-for-y-copy",
+   "rule": "Copy never uses \"X for Y\" brand comparisons.",
+   "source": "founder correction (brief 2026-11-16)",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Copy never uses \"X for Y\" brand comparisons",
+   "surface": "write",
+   "action": "block",
+   "check": "regex",
+   "message": "\"X for Y\" brand comparison in product copy. Say what it does for the user in plain words.",
+   "bad": [
+    {
+     "path": "src/pages/Landing.tsx",
+     "text": "<h1>The Uber for life coaches</h1>"
+    },
+    {
+     "path": "site/index.html",
+     "text": "<p>Think of it like Notion, but for your goals.</p>"
+    },
+    {
+     "path": "content/emails/welcome.md",
+     "text": "Meet the Duolingo of habit change."
+    }
+   ],
+   "good": [
+    {
+     "path": "src/pages/Landing.tsx",
+     "text": "<h1>Coaching that follows you through the day</h1>"
+    },
+    {
+     "path": "src/lib/auth.ts",
+     "text": "// the Google for login flow uses PKCE"
+    },
+    {
+     "path": "site/index.html",
+     "text": "<p>Sign in with Google for a faster start.</p>"
+    }
+   ],
+   "pattern": "\\b(?:[Tt]he|[Aa]n?|[Yy]our|[Oo]ur|[Ll]ike)\\s+(?:Uber|Airbnb|Netflix|Spotify|Tinder|Peloton|Duolingo|Strava|Notion|Slack|Amazon|Google|Apple|Tesla|Shopify|Stripe|Calm|Headspace|ChatGPT|Instagram|TikTok|LinkedIn|Facebook|YouTube|Fitbit|Whoop|WHOOP|Oura|MyFitnessPal|Canva|Zoom|Discord|Twitter|Figma|Salesforce|HubSpot|MasterClass|Masterclass|Waze|Lyft|Deliveroo|Etsy|eBay|Pinterest|Reddit|Substack|Patreon|Mailchimp|Zapier|Calendly|Trello|Asana|WordPress|Squarespace|Wix|Noom|Hinge|Bumble)\\s+(?:for|of)\\s+[a-z]|\\b(?:Uber|Airbnb|Netflix|Spotify|Tinder|Peloton|Duolingo|Strava|Notion|Slack|Amazon|Google|Apple|Tesla|Shopify|Stripe|Calm|Headspace|ChatGPT|Instagram|TikTok|LinkedIn|Facebook|YouTube|Fitbit|Whoop|WHOOP|Oura|MyFitnessPal|Canva|Zoom|Discord|Twitter|Figma|Salesforce|HubSpot|MasterClass|Masterclass|Waze|Lyft|Deliveroo|Etsy|eBay|Pinterest|Reddit|Substack|Patreon|Mailchimp|Zapier|Calendly|Trello|Asana|WordPress|Squarespace|Wix|Noom|Hinge|Bumble)-for-[a-z]|\\b[Ll]ike\\s+(?:Uber|Airbnb|Netflix|Spotify|Tinder|Peloton|Duolingo|Strava|Notion|Slack|Amazon|Google|Apple|Tesla|Shopify|Stripe|Calm|Headspace|ChatGPT|Instagram|TikTok|LinkedIn|Facebook|YouTube|Fitbit|Whoop|WHOOP|Oura|MyFitnessPal|Canva|Zoom|Discord|Twitter|Figma|Salesforce|HubSpot|MasterClass|Masterclass|Waze|Lyft|Deliveroo|Etsy|eBay|Pinterest|Reddit|Substack|Patreon|Mailchimp|Zapier|Calendly|Trello|Asana|WordPress|Squarespace|Wix|Noom|Hinge|Bumble),?\\s+but\\s+for\\b",
+   "flags": "",
+   "paths": "\\.(?:html?|tsx|jsx|astro|vue|svelte|mdx|liquid|hbs|ejs|njk)$|(?:^|/)(?:copy|content|locales?|i18n|emails?|marketing|landing|site|pages|templates|public)/",
+   "skip_paths": "(?:^|/)(?:tests?|__tests__|fixtures)/|docs/learning/|cloud-kit/|(?:^|/)\\.claude/"
+  },
+  {
+   "id": "empty-commit-ci-restart",
+   "rule": "Never push or empty-commit just to restart checks.",
+   "source": "rules/working-style.md CI",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Never push or empty-commit just to restart checks",
+   "surface": "bash",
+   "action": "block",
+   "check": "regex",
+   "message": "Empty commits re-queue the PR at the back. Slow isn't stuck: check whether other PRs got results recently.",
+   "bad": [
+    "git commit --allow-empty -m 'ci: retrigger checks'"
+   ],
+   "good": [
+    "git commit -m 'fix(ci): pin node 20'"
+   ],
+   "pattern": "\\bgit\\b[^\\n;&|]*\\bcommit\\b[^\\n;&|]*--allow-empty\\b"
+  },
+  {
+   "id": "autocompact-window",
+   "rule": "autoCompactWindow stays 250000; never commit a different number.",
+   "source": "rules/token-discipline.md (founder 2026-10-17)",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "autoCompactWindow is 250000",
+   "surface": "write",
+   "action": "block",
+   "check": "regex",
+   "message": "autoCompactWindow must stay 250000 (founder 2026-10-17).",
+   "bad": [
+    {
+     "path": "/r/app/.claude/settings.json",
+     "text": "{\"autoCompactWindow\": 200000}"
+    }
+   ],
+   "good": [
+    {
+     "path": "/r/app/.claude/settings.json",
+     "text": "{\"autoCompactWindow\": 250000}"
+    },
+    {
+     "path": "/r/app/config.json",
+     "text": "{\"autoCompactWindow\": 1}"
+    }
+   ],
+   "pattern": "\\\"autoCompactWindow\\\"\\s*:\\s*(?!250000\\b)\\d+",
+   "paths": "(?:^|/)\\.claude/settings(?:\\.local)?\\.json$"
+  },
+  {
+   "id": "risky-git-ask",
+   "rule": "Ask before force-push, hard reset, branch -D or skipping git hooks.",
+   "source": "rules/git-workflow.md",
+   "class": "check",
+   "home": "cloud-kit/rules/git-workflow.md",
+   "anchor": "Still ask first ✓",
+   "surface": "bash",
+   "action": "ask",
+   "check": "regex",
+   "message": "Destructive git operation: the founder confirms these first.",
+   "bad": [
+    "git push --force origin main",
+    "git reset --hard HEAD~3",
+    "git branch -D feat/old"
+   ],
+   "good": [
+    "git push --force-with-lease origin feat/x",
+    "git push -u origin feat/x",
+    "git branch -d feat/merged"
+   ],
+   "pattern": "\\bgit\\b[^\\n;&|]*\\bpush\\b[^\\n;&|]*(?:--force(?![-\\w])|\\s-f\\b)|--no-verify\\b|\\bgit\\b[^\\n;&|]*\\breset\\b[^\\n;&|]*--hard\\b|\\bgit\\b[^\\n;&|]*\\bbranch\\b[^\\n;&|]*\\s-D\\b",
+   "flags": ""
+  },
+  {
+   "id": "print-secret",
+   "rule": "Never print a secret to the terminal (vault get, echo, printenv, cat .env).",
+   "source": "rules/openrouter-os-mobile-only.md ('never print the key') + system rule",
+   "class": "check",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Never print a secret",
+   "surface": "bash",
+   "action": "block",
+   "check": "regex",
+   "message": "This prints a secret into the transcript. Use `vault run -- <cmd>` or pipe it straight to where it is needed.",
+   "bad": [
+    "vault get OPENROUTER_API_KEY",
+    "echo $ANTHROPIC_API_KEY",
+    "cat .env.local",
+    "env | grep API"
+   ],
+   "good": [
+    "vault get GH_TOKEN | gh auth login --with-token",
+    "cat .env.example",
+    "vault run -- npm run deploy",
+    "echo $PATH"
+   ],
+   "pattern": "\\bvault\\s+get\\b(?![^\\n]*\\|)|\\becho\\s+[\\\"']?\\$\\{?\\w*(?:KEY|TOKEN|SECRET|PASSWORD)\\w*|\\bprintenv\\s+\\w*(?:KEY|TOKEN|SECRET|PASSWORD)|(?:^|[;&|]\\s*)(?:printenv|env)\\s*(?:$|\\|)|\\bcat\\s+[^\\n;&|]*\\.env\\b(?!\\.example|\\.sample|\\.template)",
+   "flags": "m",
+   "no_override": true
+  },
+  {
+   "id": "test-account-delete",
+   "rule": "Never delete, soft-delete or clean up a registered test account.",
+   "source": "rules/test-accounts.md (2026-11-06 incident)",
+   "class": "check",
+   "home": "cloud-kit/rules/test-accounts.md",
+   "anchor": "Never delete, soft-delete",
+   "surface": [
+    "bash",
+    "write"
+   ],
+   "action": "block",
+   "check": "regex",
+   "message": "Registered qa+ test accounts are never deleted: reset their data instead (memory `reference-test-accounts`).",
+   "bad": [
+    "psql \"$DB\" -c \"delete from auth.users where email like 'qa+%@unleashed.vision'\"",
+    {
+     "path": "scripts/qa-cleanup.ts",
+     "text": "await softDelete(users.filter(u => u.email.startsWith('qa+os-member@')))"
+    }
+   ],
+   "good": [
+    "psql \"$DB\" -c \"select id from auth.users where email = 'qa+os-member@unleashed.vision'\"",
+    {
+     "path": "scripts/qa-reset.ts",
+     "text": "await resetJournal('qa+os-member@unleashed.vision')"
+    }
+   ],
+   "pattern": "(?:\\bdelete\\b|soft[_-]?delete|deleted_at|deleteUser|\\bremove\\b)[^\\n]{0,200}qa\\+[\\w.%*-]*@|qa\\+[\\w.%*-]*@[^\\n]{0,200}(?:\\bdelete\\b|soft[_-]?delete|deleted_at\\s*=|deleteUser)",
+   "no_override": true
+  },
+  {
+   "id": "commit-message-format",
+   "rule": "Commit messages are `<type>: <description>`.",
+   "source": "rules/git-workflow.md",
+   "class": "check",
+   "home": "cloud-kit/rules/git-workflow.md",
+   "anchor": "Commit messages: `<type>: <description>`",
+   "surface": "bash",
+   "action": "warn",
+   "check": "fn:commit_format",
+   "message": "Commit subject should be `<type>: <description>` (feat, fix, refactor, docs, test, chore, perf, ci).",
+   "bad": [
+    "git commit -m 'updated stuff'"
+   ],
+   "good": [
+    "git commit -m 'fix(auth): refresh token on 401'",
+    "git commit -m \"$(cat msg.txt)\""
+   ]
+  },
+  {
+   "id": "time-estimate-in-reply",
+   "rule": "Never estimate duration.",
+   "source": "rules/working-style.md (HARD RULE 2026-10-08)",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Never estimate duration ✓",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Time estimate in the reply. Size work by what it touches (files, systems, risk), never by time.",
+   "bad": [
+    "This will take about 2 hours to finish.",
+    "Fix is ready; ETA for the deploy is tonight.",
+    "Roughly 3 days of work left on the importer.",
+    "It should be done in 20 minutes."
+   ],
+   "good": [
+    "Unit tests ran in 3m19s.",
+    "The last deploy took 4 minutes.",
+    "CI went green about 20 minutes ago.",
+    "Touches 3 files and one migration.",
+    "The eta field is null.",
+    "It is ~10 minutes slower than before."
+   ],
+   "pattern": "\\b(?:will|would|should|could|might|may|can|it'?ll)\\s+(?:only\\s+|probably\\s+|likely\\s+)?take\\s+(?:about\\s+|around\\s+|roughly\\s+|~\\s*|under\\s+|less than\\s+)?(?:\\d+|a few|a couple of|an?|several|half an?)\\s*(?:-\\s*\\d+\\s*)?(?:sec|second|min|minute|hour|hr|day|week|month)s?\\b|\\btakes?\\s+(?:about|around|roughly|~)\\s*\\d+\\s*(?:sec|second|min|minute|hour|hr|day|week)s?\\b|(?:~|\\babout\\s|\\baround\\s|\\broughly\\s)\\s*\\d+(?:\\s*-\\s*\\d+)?\\s*(?:min|minute|hour|hr|day|week)s?\\b(?!\\s+(?:ago|slower|faster|later than|earlier than))|(?-i:\\bETA\\b)|\\b\\d+\\s*(?:hours?|days?|weeks?)\\s+of\\s+(?:work|effort|dev)|\\bwon'?t\\s+take\\s+long\\b|\\b(?:should|will)\\s+be\\s+(?:done|ready|finished)\\s+(?:in|within)\\s+(?:about\\s+)?(?:\\d+|an?|a few)\\s*(?:min|minute|hour|hr|day|week)"
+  },
+  {
+   "id": "unverified-url-in-reply",
+   "rule": "Every link given must be live: opened this session or a known dashboard deep link.",
+   "source": "rules/user-handoffs.md §3/§6 + brief 'linking an un-live URL'",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Every link you give must be live",
+   "surface": "reply",
+   "action": "block",
+   "check": "fn:unverified_url",
+   "message": "Link not opened this session (and not a known dashboard). Open it first (curl/WebFetch) or drop it.",
+   "bad": [
+    {
+     "text": "Live at https://unleashed-coach-preview.vercel.app/coach",
+     "ctx": {
+      "seen_urls": []
+     }
+    },
+    "Open http://localhost:3000/admin to check.",
+    {
+     "text": "Docs: https://docs.acme-vendor.io/setup/keys",
+     "ctx": {
+      "seen_urls": [
+       "https://docs.acme-vendor.io/pricing"
+      ]
+     }
+    }
+   ],
+   "good": [
+    {
+     "text": "Docs: https://docs.acme-vendor.io/setup/keys",
+     "ctx": {
+      "seen_urls": [
+       "https://docs.acme-vendor.io/setup/keys"
+      ]
+     }
+    },
+    "PR: https://github.com/UnleashedPPOS/unleashed-superpowers/pull/42",
+    "Run `curl http://localhost:3000/health` locally."
+   ]
+  },
+  {
+   "id": "status-in-chat",
+   "rule": "Once a status page exists, status goes only on the page, not in chat.",
+   "source": "output-styles/high-level.md (HARD RULE 2026-10-10) + brief",
+   "class": "check",
+   "home": "output-styles/high-level.md",
+   "anchor": "Never write the same status in both places",
+   "surface": "reply",
+   "action": "block",
+   "check": "fn:status_in_chat",
+   "message": "Status sections written in chat while a status page exists. Put them on the page; chat gets 1-2 lines.",
+   "bad": [
+    {
+     "text": "**Done:** importer live (PR #4)\n**Remaining:** none\n**Needs you:** nothing",
+     "ctx": {
+      "page_published": true
+     }
+    }
+   ],
+   "good": [
+    {
+     "text": "**Done:** importer live (PR #4)\n**Remaining:** none",
+     "ctx": {
+      "page_published": false
+     }
+    },
+    {
+     "text": "NOT SHIPPABLE: migration fails.\nDone: importer\nRemaining: migration",
+     "ctx": {
+      "page_published": true
+     }
+    },
+    {
+     "text": "Shippable, merged. Page: https://claude.ai/code/artifact/abc",
+     "ctx": {
+      "page_published": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "permission-question-in-reply",
+   "rule": "Never ask permission for work already asked for (incl. \"want me to ship-check?\").",
+   "source": "rules/working-style.md (2026-10-08) + Output",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Never ask \"want me to go ahead?\"",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Asking permission for work already asked for. Do it, then report.",
+   "bad": [
+    "PR is up. Want me to run ship-check?",
+    "Let me know if you'd like the settings screen too."
+   ],
+   "good": [
+    "PR is up and ship-checked.",
+    "Which region should the bucket use: London or Frankfurt?"
+   ],
+   "pattern": "\\b(?:want me to|shall I|would you like me to|should I (?:go ahead|proceed|continue|start|merge|ship|run)|let me know if you(?:'d| would) like|happy to [^.?!\\n]{0,60} if you(?: want|'d like| like)?)\\b"
+  },
+  {
+   "id": "multiple-questions-in-reply",
+   "rule": "At most one question per turn.",
+   "source": "rules/working-style.md + output style",
+   "class": "check",
+   "home": "output-styles/high-level.md",
+   "anchor": "Ask at most one question per turn",
+   "surface": "reply",
+   "action": "block",
+   "check": "fn:multi_question",
+   "message": "More than one question. Ask the single most important one; take sensible defaults for the rest and say what you chose.",
+   "bad": [
+    "Which region? And should the bucket be public?"
+   ],
+   "good": [
+    "Which region should the bucket use?",
+    "See https://github.com/o/r/pull/1?tab=files for the diff."
+   ]
+  },
+  {
+   "id": "deferral-in-reply",
+   "rule": "Build all of it: no phase 2, follow-up PRs, MVP or 'keeping the session small'.",
+   "source": "rules/working-style.md + rules/token-discipline.md (HARD RULE 2026-10-08)",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "no \"phase 2 / later / MVP-then-maybe\" ✓",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Deferral talk. Build the whole scope now (split into sub-agent slices if big); anything truly blocked goes in Remaining with why.",
+   "bad": [
+    "Core flow done; settings screen in a follow-up PR.",
+    "Shipped the MVP of the importer.",
+    "I'm keeping the session small, so the rest is parked until later.",
+    "Given time constraints, I skipped the docs.",
+    "I scoped it down to the API only."
+   ],
+   "good": [
+    "Built the core flow and the settings screen.",
+    "Remaining: blocked on Apple review (needs you)."
+   ],
+   "pattern": "(?i:\\bphase\\s*(?:2|two|ii)\\b|\\bfollow-?up PR\\b|\\bin a (?:later|future|separate|follow-?up) (?:PR|pass|session|chat|iteration)\\b|\\bkeep(?:ing)? (?:the|this) (?:session|chat|context) (?:small|lean|short)\\b|\\b(?:left|parked|deferred|saved) (?:for|until) later\\b|\\bout of scope for now\\b|\\b(?:given|due to|because of) (?:the )?(?:time|effort) (?:constraints?|limits?|budget)\\b|\\bscop(?:ed|ing) (?:it |this |the \\w+ )?down\\b)|\\bMVP\\b",
+   "flags": ""
+  },
+  {
+   "id": "connector-auth-in-reply",
+   "rule": "Never raise MCP/connector auth problems; use the CLI and move on.",
+   "source": "rules/working-style.md (founder 2026-10-01)",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Never raise MCP/connector auth problems ✓",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Connector/MCP auth problem raised to the founder. Use the CLI and don't mention it.",
+   "bad": [
+    "The GitHub MCP needs re-authentication; please reconnect it.",
+    "Please reconnect the Slack connector."
+   ],
+   "good": [
+    "Opened the PR with the gh CLI.",
+    "Added an MCP server for the RAG index."
+   ],
+   "pattern": "\\b(?:MCP|connector)s?\\b[^.\\n]{0,80}\\b(?:auth(?:entication|ori[sz]ation)?|re-?auth\\w*|log ?in|reconnect\\w*|not connected|failed to connect|disconnected)\\b|\\b(?:reconnect|re-?authori[sz]e|re-?auth)\\b[^.\\n]{0,40}\\b(?:MCP|connector)s?\\b"
+  },
+  {
+   "id": "merge-on-founder-list",
+   "rule": "Never put \"merge this\" on the founder's list; merge it yourself when green.",
+   "source": "rules/working-style.md",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "never put \"merge this\" on the founder's list ✓",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Asking the founder to merge. Merge it yourself once reviewed, green and conflict-free (unless the brief says don't).",
+   "bad": [
+    "Needs you: merge PR #42 when ready.",
+    "Please merge #42."
+   ],
+   "good": [
+    "Merged PR #42 after CI went green.",
+    "I'll merge PR #42 once CI is green.",
+    "Not merged: the brief says leave it for review."
+   ],
+   "pattern": "(?:Needs you|only you|for you to|you can|you'?ll need to|you should|go ahead and|please|just)\\b[^.\\n]{0,40}\\bmerge\\b|\\bclick (?:the )?[\\\"']?merge|\\bneeds? your (?:approval to )?merge"
+  },
+  {
+   "id": "supabase-dashboard-paste",
+   "rule": "Never default to 'paste this in the Supabase dashboard'; use the CLI.",
+   "source": "rules/supabase.md",
+   "class": "check",
+   "home": "cloud-kit/rules/supabase.md",
+   "anchor": "Never default to \"paste this in the Dashboard\" ✓",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Sending the founder to the Supabase dashboard. Use `supabase db query --linked` (or MCP) yourself.",
+   "bad": [
+    "Paste migration.sql into the Supabase SQL editor."
+   ],
+   "good": [
+    "Applied the migration with the Supabase CLI and checked it with a SELECT."
+   ],
+   "pattern": "\\b(?:paste|run|apply)\\b[^\\n]{0,80}?\\b(?:Supabase dashboard|SQL editor)\\b"
+  },
+  {
+   "id": "login-for-cli-tool",
+   "rule": "Never ask the founder to log in to a tool we drive by CLI + vault key.",
+   "source": "rules/credential-handoffs.md (founder 2026-10-01)",
+   "class": "check",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Never put a login on the founder's list",
+   "surface": "reply",
+   "action": "block",
+   "check": "regex",
+   "message": "Asking the founder to log in to a CLI-drivable tool. Check `vault list` and use the CLI.",
+   "bad": [
+    "Needs you: log in to Vercel so I can deploy.",
+    "Run gh auth login and paste the code."
+   ],
+   "good": [
+    "Deployed with the Vercel CLI.",
+    "Needs you: create the OAuth client in Google Cloud (link below)."
+   ],
+   "pattern": "\\b(?:log ?in|sign ?in)\\s+(?:to|into)\\s+(?:the\\s+)?(?:Supabase|Vercel|GitHub|Fly(?:\\.io)?|Railway|Telnyx|Groq|Netlify|Cloudflare)\\b|\\b(?:supabase|vercel|gh|fly|railway|netlify|wrangler)\\s+(?:auth\\s+)?login\\b"
+  },
+  {
+   "id": "narration-while-working",
+   "rule": "No narration while working: zero chat text between tool calls.",
+   "source": "output-styles/high-level.md (founder 2026-10-15)",
+   "class": "check",
+   "home": "output-styles/high-level.md",
+   "anchor": "No narration. No \"Let me…\"",
+   "surface": "turn",
+   "action": "warn",
+   "check": "fn:narration",
+   "message": "Text written while working. The founder reads only the ending: call tools with no commentary.",
+   "bad": [
+    "Let me check the tests now."
+   ],
+   "good": [
+    "`ls`",
+    "```\nnpm test\n```"
+   ]
+  },
+  {
+   "id": "batch-tool-calls",
+   "rule": "Batch independent tool calls; never 8+ single calls in a row.",
+   "source": "rules/token-discipline.md",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "The `serial-call-nudge.py` hook warns",
+   "check": "external:cloud-kit/hooks/serial-call-nudge.py"
+  },
+  {
+   "id": "auto-ship-check",
+   "rule": "Run /ship-check before merging and before the final message.",
+   "source": "rules/working-style.md",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Auto ship-check",
+   "check": "external:cloud-kit/hooks/auto-ship-check.py"
+  },
+  {
+   "id": "status-page-heartbeat",
+   "rule": "Long work republishes the status page about every 30 min.",
+   "source": "output-styles/high-level.md",
+   "class": "check",
+   "home": "output-styles/high-level.md",
+   "anchor": "Republish the page about every 30 min",
+   "check": "external:cloud-kit/hooks/status-page-heartbeat.py"
+  },
+  {
+   "id": "rules-word-budget",
+   "rule": "Always-loaded rules stay under the word budget.",
+   "source": "brief 2026-11-16 item 5",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Always-loaded rules have a word budget",
+   "check": "external:tests/learning/test_word_budget.py"
+  },
+  {
+   "id": "no-time-as-reason",
+   "rule": "Never use time or effort as a reason to shrink, phase, defer or ask permission.",
+   "source": "rules/working-style.md",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "never use time or effort as a reason",
+   "check": "external:same check: deferral-in-reply, permission-question-in-reply"
+  },
+  {
+   "id": "session-size-not-a-reason",
+   "rule": "Context size is never a reason to defer; never say 'keeping the session small'.",
+   "source": "rules/token-discipline.md",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "keeping the session small",
+   "check": "external:same check: deferral-in-reply"
+  },
+  {
+   "id": "verify-url-before-giving",
+   "rule": "Verify every URL before giving it; guessed URL state is fiction.",
+   "source": "rules/user-handoffs.md",
+   "class": "check",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Verify every URL before giving it",
+   "check": "external:same check: unverified-url-in-reply"
+  },
+  {
+   "id": "no-ship-check-offer",
+   "rule": "Never end with 'want me to ship-check?'.",
+   "source": "rules/working-style.md",
+   "class": "check",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Never end with \"want me to ship-check?\" ✓",
+   "check": "external:same check: permission-question-in-reply"
+  },
+  {
+   "id": "no-secrets-in-commits",
+   "rule": "No secrets in commits.",
+   "source": "rules/git-workflow.md",
+   "class": "check",
+   "home": "cloud-kit/rules/git-workflow.md",
+   "anchor": "no secrets ✓",
+   "check": "external:same check: secret-in-tool-input"
+  },
+  {
+   "id": "openrouter-hook-line",
+   "rule": "The hook blocks OpenRouter outside the OS repos.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "check",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "blocks OpenRouter calls and keys outside the OS repos ✓",
+   "check": "external:same check: openrouter-outside-os"
+  },
+  {
+   "id": "flaky-not-diagnosis",
+   "rule": "'Flaky' is not a diagnosis: reproduce, fix the cause, prove it.",
+   "source": "rules/working-style.md",
+   "class": "eval",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "\"Flaky\" is not a diagnosis",
+   "eval": "evals/red-team-flaky"
+  },
+  {
+   "id": "prompt-is-floor",
+   "rule": "The prompt is a floor: build the missing states, flows, copy, docs and tests.",
+   "source": "rules/working-style.md",
+   "class": "eval",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "The prompt is a floor",
+   "eval": "evals/dod-verdict-first"
+  },
+  {
+   "id": "ship-check-before-final",
+   "rule": "Ship-check runs before the final message; never offered as a question.",
+   "source": "rules/working-style.md",
+   "class": "eval",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "run /ship-check (red-team) BEFORE merging",
+   "eval": "evals/ship-check-no-offer"
+  },
+  {
+   "id": "say-each-fact-once",
+   "rule": "Say each fact once; later messages report only the delta.",
+   "source": "output-styles/high-level.md",
+   "class": "eval",
+   "home": "output-styles/high-level.md",
+   "anchor": "Say each fact once",
+   "eval": "evals/high-level-status-on-page"
+  },
+  {
+   "id": "no-found-and-fixed",
+   "rule": "Never report bugs found and fixed or review rounds.",
+   "source": "output-styles/high-level.md",
+   "class": "eval",
+   "home": "output-styles/high-level.md",
+   "anchor": "Never report bugs that were found and fixed",
+   "eval": "evals/high-level-status-on-page"
+  },
+  {
+   "id": "remaining-honest-verdict",
+   "rule": "'No known bugs, nothing left' only when shippable, merged and green.",
+   "source": "output-styles/high-level.md",
+   "class": "eval",
+   "home": "output-styles/high-level.md",
+   "anchor": "No known bugs, nothing left",
+   "eval": "evals/dod-verdict-first"
+  },
+  {
+   "id": "handoff-carries-everything",
+   "rule": "A handoff carries every not-done item forward; never dropped.",
+   "source": "skills/session-handoff",
+   "class": "eval",
+   "home": "skills/session-handoff/SKILL.md",
+   "anchor": "never drop a not-done item",
+   "eval": "evals/session-handoff-carries-items"
+  },
+  {
+   "id": "correction-becomes-check",
+   "rule": "A correction becomes a check or eval plus a one-line rule plus an inventory link.",
+   "source": "brief 2026-11-16 item 3",
+   "class": "eval",
+   "home": "commands/learnings.md",
+   "anchor": "a correction becomes a check, in one step",
+   "eval": "evals/learnings-correction-to-check"
+  },
+  {
+   "id": "no-reply-on-no-change",
+   "rule": "Background notifications with no change get no reply.",
+   "source": "rules/working-style.md",
+   "class": "eval",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Background notifications with no change = no reply",
+   "eval": "evals/high-level-status-on-page"
+  },
+  {
+   "id": "bring-fixes",
+   "rule": "Bring fixes, not problems.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Bring fixes, not problems"
+  },
+  {
+   "id": "dismissed-question",
+   "rule": "A dismissed question stays dismissed.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "A dismissed question stays dismissed"
+  },
+  {
+   "id": "only-you-list",
+   "rule": "One short ordered 'only you can do' list with deep links, updated in place.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "One short ordered Needs you list"
+  },
+  {
+   "id": "merge-yourself",
+   "rule": "Merge it yourself once reviewed, green and conflict-free; a 'do not merge' brief wins.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Merge it yourself once reviewed"
+  },
+  {
+   "id": "safety-denied-merge",
+   "rule": "A denied merge is reported once; never reach the same result another way.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "If a safety check denies the merge, report once and stop"
+  },
+  {
+   "id": "local-ops-list",
+   "rule": "Work that can't run here goes on the local-ops list, never faked.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "goes on the local-ops list, never faked"
+  },
+  {
+   "id": "slow-not-stuck",
+   "rule": "Slow isn't stuck; compare with other PRs before calling CI stuck.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Slow isn't stuck"
+  },
+  {
+   "id": "worktree-per-helper",
+   "rule": "Each helper works in its own worktree; verify pwd before merge/commit.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Each helper works in its own worktree"
+  },
+  {
+   "id": "fetch-before-touch",
+   "rule": "Fetch and rebase before touching a shared branch.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "`git fetch` + rebase/pull before touching a branch"
+  },
+  {
+   "id": "recount-conflicts",
+   "rule": "Count conflicts: recount the real thing, never pick a side.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "recount the real thing, never pick a side"
+  },
+  {
+   "id": "size-by-touch",
+   "rule": "Size work by what it touches, never by time.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Size work by what it touches"
+  },
+  {
+   "id": "ask-only-founder-choices",
+   "rule": "Ask only for the founder's choices: money, brand, irreversible, conflicting goals.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "Ask only when the choice is genuinely the founder's"
+  },
+  {
+   "id": "fewest-words",
+   "rule": "Output tokens are money: fewest words that carry the fact.",
+   "source": "rules/working-style.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/working-style.md",
+   "anchor": "fewest words that carry the fact"
+  },
+  {
+   "id": "read-once",
+   "rule": "Read a file region once in a generous chunk; don't re-grep.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Read a file region once"
+  },
+  {
+   "id": "no-still-waiting",
+   "rule": "Never send 'still waiting' turns; blocked is said once.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Never send \"still waiting\" turns"
+  },
+  {
+   "id": "wait-handoff",
+   "rule": "Waiting > 5 min: end the turn, handoff file, resume via notification/wakeup.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Waiting > 5 min"
+  },
+  {
+   "id": "one-watcher",
+   "rule": "One watcher for all PRs; exit on a ~60 min stall.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "One watcher for all PRs"
+  },
+  {
+   "id": "fresh-chat-next-job",
+   "rule": "Start the next job in a fresh chat with a handoff.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Start the NEXT job in a fresh chat"
+  },
+  {
+   "id": "model-table",
+   "rule": "Plan in Opus, build in Sonnet (Haiku for mechanical), review and ship-check in Opus.",
+   "source": "rules/token-discipline.md (founder HARD RULE 2026-11-16)",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "plan in Opus -> build in Sonnet"
+  },
+  {
+   "id": "never-fable-subagent",
+   "rule": "Never Fable for lanes, routines or sub-agents.",
+   "source": "rules/token-discipline.md (founder HARD RULE 2026-11-16: two lanes died on the weekly Fable limit)",
+   "class": "check",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "NEVER Fable (`claude-fable-5-2`)",
+   "surface": [
+    "agent",
+    "write"
+   ],
+   "action": "block",
+   "check": "regex",
+   "flags": "im",
+   "pattern": "(?:^|[{,])\\s*\"?model\"?\\s*:\\s*[\"']?(?:claude-)?fable\\b",
+   "message": "Never Fable for lanes, routines or sub-agents (founder HARD RULE 2026-11-16). Build in Sonnet, plan and review in Opus.",
+   "bad": [
+    "model: fable\nsubagent_type: general-purpose",
+    {
+     "path": "/r/kit/cloud-kit/agents/builder.md",
+     "text": "---\nname: builder\nmodel: fable\n---\n"
+    },
+    {
+     "path": "/r/app/routine.json",
+     "text": "{\"model\": \"claude-fable-5-2\"}"
+    }
+   ],
+   "good": [
+    "model: sonnet\nsubagent_type: sonnet-builder",
+    {
+     "path": "/r/kit/cloud-kit/agents/builder.md",
+     "text": "---\nname: builder\nmodel: sonnet\n---\nNever use Fable here.\n"
+    }
+   ],
+   "no_override": true
+  },
+  {
+   "id": "subagent-budget",
+   "rule": "At most 3 sub-agents per lane or chat; reuse one via SendMessage.",
+   "source": "rules/token-discipline.md (founder 2026-11-16)",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "at most 3 sub-agents per lane/chat"
+  },
+  {
+   "id": "cheaper-tier-first",
+   "rule": "Unsure of tier: cheaper first, escalate one tier on weak results.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "pick the cheaper one and escalate one tier"
+  },
+  {
+   "id": "effort-medium",
+   "rule": "Effort medium by default; high only when genuinely hard.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Effort medium by default"
+  },
+  {
+   "id": "subagent-one-result",
+   "rule": "Sub-agents work silently and return one result under 300 words.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "return ONE result under 300 words"
+  },
+  {
+   "id": "adhoc-model",
+   "rule": "Ad-hoc agents must pass model:.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Ad-hoc agents must pass `model:`"
+  },
+  {
+   "id": "cloud-first",
+   "rule": "Cloud first; at most one local sub-agent.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Cloud first: work that can run in the cloud"
+  },
+  {
+   "id": "lean-context",
+   "rule": "No whole-file reads of big files; filter output; CLIs over connectors.",
+   "source": "rules/token-discipline.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "No whole-file Reads of large files"
+  },
+  {
+   "id": "place-work",
+   "rule": "Place work by machine limits (cloud/Netcup/laptop).",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "place the work"
+  },
+  {
+   "id": "no-delete-for-space",
+   "rule": "Never fix overload by deleting things that serve users.",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "Never fix overload by deleting volumes"
+  },
+  {
+   "id": "no-ci-parallelism",
+   "rule": "Never raise CI parallelism or add test load on Netcup.",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "never raise CI parallelism"
+  },
+  {
+   "id": "routines-no-poll",
+   "rule": "Never poll routine lists in a loop; explicit model per routine.",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "never poll in a loop"
+  },
+  {
+   "id": "retemplate-routines",
+   "rule": "Re-template booked routines when a skill or rule changes.",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "Booked routines are prompt snapshots"
+  },
+  {
+   "id": "worktree-remove",
+   "rule": "Remove a worktree the moment its PR merges.",
+   "source": "skills/where-work-runs/SKILL.md",
+   "class": "prose",
+   "home": "skills/where-work-runs/SKILL.md",
+   "anchor": "Remove your worktree the moment its PR merges"
+  },
+  {
+   "id": "os-fallback-required",
+   "rule": "OS calls on OpenRouter must fail over instantly, with tests; no OS feature without it.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "No new OS feature without that fallback"
+  },
+  {
+   "id": "chain-order",
+   "rule": "Non-OS LLM calls use Bedrock → Groq → Anthropic with no-gap failover.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "Everything else uses the chain AWS Bedrock"
+  },
+  {
+   "id": "embeddings-frozen",
+   "rule": "Never change an embeddings model.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "Never change an embeddings model"
+  },
+  {
+   "id": "cheapest-model",
+   "rule": "Pick the cheapest model that passes the job's eval; log the hop.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "Pick the cheapest model that passes"
+  },
+  {
+   "id": "check-provider-first",
+   "rule": "Check which provider a call hits before adding or changing it.",
+   "source": "rules/llm-provider-chain.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/llm-provider-chain.md",
+   "anchor": "Before adding or changing any LLM call"
+  },
+  {
+   "id": "gpt-oss-quirks",
+   "rule": "gpt-oss: include_reasoning false, no response_format, max_tokens headroom.",
+   "source": "skills/llm-provider-chain/SKILL.md",
+   "class": "prose",
+   "home": "skills/llm-provider-chain/SKILL.md",
+   "anchor": "include_reasoning\": false"
+  },
+  {
+   "id": "haiku-400s",
+   "rule": "Strip temperature/top_p/response_format on the Haiku hop.",
+   "source": "skills/llm-provider-chain/SKILL.md",
+   "class": "prose",
+   "home": "skills/llm-provider-chain/SKILL.md",
+   "anchor": "Haiku 5.5 returns 400"
+  },
+  {
+   "id": "llm-migration-routine",
+   "rule": "Moving a repo off OpenRouter: one helper, mocked tests, one PR, no merge.",
+   "source": "skills/llm-provider-chain/SKILL.md",
+   "class": "prose",
+   "home": "skills/llm-provider-chain/SKILL.md",
+   "anchor": "## Migration routine (moving a repo off OpenRouter"
+  },
+  {
+   "id": "no-self-drive-credentials",
+   "rule": "Never self-drive credential flows; hand off at once.",
+   "source": "rules/user-handoffs.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "never self-drive"
+  },
+  {
+   "id": "handoff-step-format",
+   "rule": "Each hand-off step: unlocks line, deep link, click/copy, paste-back format.",
+   "source": "rules/user-handoffs.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Each hand-off step"
+  },
+  {
+   "id": "handoff-on-page",
+   "rule": "Hand-offs go in Needs you on the page.",
+   "source": "rules/user-handoffs.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "Where it goes: the status page's Needs you"
+  },
+  {
+   "id": "finish-after-paste",
+   "rule": "After the founder pastes, do every downstream step.",
+   "source": "rules/user-handoffs.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/user-handoffs.md",
+   "anchor": "After the founder pastes"
+  },
+  {
+   "id": "check-research-first",
+   "rule": "Check memory for existing research before researching.",
+   "source": "rules/research-memory.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/research-memory.md",
+   "anchor": "Before researching"
+  },
+  {
+   "id": "file-research",
+   "rule": "File research in unleashed-memory with report.html, memory file and index line.",
+   "source": "rules/research-memory.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/research-memory.md",
+   "anchor": "After researching, every time"
+  },
+  {
+   "id": "cloud-research-fallback",
+   "rule": "Cloud: push to unleashed-memory, else full findings in the PR/issue.",
+   "source": "rules/research-memory.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/research-memory.md",
+   "anchor": "Cloud session: clone unleashed-memory"
+  },
+  {
+   "id": "supabase-cli-first",
+   "rule": "Supabase: CLI first, MCP fallback, Dashboard last.",
+   "source": "rules/supabase.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/supabase.md",
+   "anchor": "CLI first, MCP only as fallback"
+  },
+  {
+   "id": "confirm-linked-project",
+   "rule": "Confirm the linked project before writes; verify with a SELECT.",
+   "source": "rules/supabase.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/supabase.md",
+   "anchor": "Confirm the linked project before any write"
+  },
+  {
+   "id": "cloud-supabase",
+   "rule": "Cloud with no CLI: MCP, else SQL in the PR under Needs you.",
+   "source": "rules/supabase.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/supabase.md",
+   "anchor": "Cloud session (no CLI, nothing linked)"
+  },
+  {
+   "id": "reuse-test-accounts",
+   "rule": "Reuse the registered test account per project and role.",
+   "source": "rules/test-accounts.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/test-accounts.md",
+   "anchor": "use a fitting existing account"
+  },
+  {
+   "id": "reset-not-recreate",
+   "rule": "Need a clean state: reset data, don't make a new account.",
+   "source": "rules/test-accounts.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/test-accounts.md",
+   "anchor": "Need a clean state"
+  },
+  {
+   "id": "extend-fixtures",
+   "rule": "Extend repo fixtures; don't regenerate.",
+   "source": "rules/test-accounts.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/test-accounts.md",
+   "anchor": "extend, don't regenerate"
+  },
+  {
+   "id": "share-setup",
+   "rule": "Every setup change ships to unleashed-superpowers in the same job.",
+   "source": "rules/share-setup.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/share-setup.md",
+   "anchor": "ships a shareable copy"
+  },
+  {
+   "id": "strip-personal",
+   "rule": "Strip secrets, phone numbers, customers, private hosts before sharing.",
+   "source": "rules/share-setup.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/share-setup.md",
+   "anchor": "Strip anything personal first"
+  },
+  {
+   "id": "auto-commit",
+   "rule": "Auto-commit clear, coherent, tested changes without asking.",
+   "source": "rules/git-workflow.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/git-workflow.md",
+   "anchor": "Auto-commit without asking"
+  },
+  {
+   "id": "pr-full-summary",
+   "rule": "PRs: full history and diff, summary with a test plan.",
+   "source": "rules/git-workflow.md",
+   "class": "prose",
+   "home": "cloud-kit/rules/git-workflow.md",
+   "anchor": "read the full commit history"
+  },
+  {
+   "id": "one-status-page",
+   "rule": "One page per piece of work, republished to the same link.",
+   "source": "output-styles/high-level.md",
+   "class": "prose",
+   "home": "output-styles/high-level.md",
+   "anchor": "Never make a second page"
+  },
+  {
+   "id": "subagents-no-page",
+   "rule": "Sub-agents never publish a page.",
+   "source": "output-styles/high-level.md",
+   "class": "prose",
+   "home": "output-styles/high-level.md",
+   "anchor": "Sub-agents never publish a page"
+  }
+ ]
+}

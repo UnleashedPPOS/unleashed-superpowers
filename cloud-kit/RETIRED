@@ -1,0 +1,9 @@
+# Rule files retired from ~/.claude/rules (one file name per line). cloud-kit/install.sh moves each
+# into ~/.claude/.retired-rules/ (reversible). Reason after the name is for humans only: keep it on
+# the comment line above.
+# 2026-11-16: merged into llm-provider-chain.md (OpenRouter is OS mobile only; one home)
+openrouter-os-mobile-only.md
+# 2026-11-16: the dev-key allowance is retired (llm-provider-chain.md); Mac-only file
+openrouter-deepseek.md
+# 2026-11-16: merged into user-handoffs.md
+credential-handoffs.md

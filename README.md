@@ -94,9 +94,15 @@ To make it permanent, run **`/high-level-mode on`** once. That writes a flag fil
 | `/high-level-mode on\|off\|status` | Turns High-Level mode on or off for this and every future session (flag file + SessionStart hook). |
 | `/ai-native-reframe` | Mid-session audit. Takes the current AI-system design and produces structured output with five sections: ENGINE, PRESENTATION, BRIDGE, GAPS, 48-HOUR PROTOTYPE. |
 | `/document-feature-module <target>` | Thin wrapper that invokes the `document-feature-module` skill against a target module. |
-| `/learnings [notes]` | Harvests lessons from this chat (or pasted notes), checks what rules, memory and hooks already cover, and implements the rest. |
+| `/learnings [notes\|unenforced\|prune]` | Turns each founder correction into an enforced check or eval case plus a one-line rule, in one step, filed in the corrections registry and inventory. `unenforced` lists corrections still prose-only; `prune` runs the monthly prune. |
 
 `/red-team` and `/dod` stay available standalone for sessions that want just one stage — `scripts/check-command-sync.sh` fails the build if either command (or `/ship-check`) drifts out of sync with its source-of-truth skill.
+
+## Continuous learning
+
+Founder corrections are enforced, not just written down. [`cloud-kit/hooks/corrections.json`](cloud-kit/hooks/corrections.json) holds every correction from the always-loaded rules, classified as a **check** (run by [`correction-checks.py`](cloud-kit/hooks/correction-checks.py) on tool calls, the final reply and the founder's prompt: credentials, OpenRouter outside the OS app, "X for Y" brand copy, time estimates, unverified links, status in chat and more), an **eval** case under `evals/`, or **prose** with one home. [`docs/learning/corrections-inventory.md`](docs/learning/corrections-inventory.md) is the generated table; `docs/learning/unenforced.md` lists what is still prose-only; [`docs/learning/monthly-prune.md`](docs/learning/monthly-prune.md) is the monthly routine. The always-loaded rules are capped by [`docs/learning/budget.json`](docs/learning/budget.json) and a test fails if they grow past it.
+
+Tests: `python3 -m unittest discover -s tests/hooks && python3 -m unittest discover -s tests/learning`.
 
 ## Definition of Done
 

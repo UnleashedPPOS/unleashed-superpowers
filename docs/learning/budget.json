@@ -1,0 +1,6 @@
+{
+  "budget": 4000,
+  "baseline_words": 6463,
+  "note": "Always-loaded set: every cloud-kit rule plus the High-Level output style. Baseline measured 2026-11-16 before the cut. Raise only with a founder decision; move detail into a skill instead.",
+  "files": ["cloud-kit/rules/*.md", "output-styles/high-level.md"]
+}

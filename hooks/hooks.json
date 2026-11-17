@@ -1,5 +1,5 @@
 {
-  "description": "High-Level mode: loads end-state-only reporting rules into every session once it is switched on with /high-level-mode on.",
+  "description": "High-Level mode session rules, plus the founder-correction checks (cloud-kit/hooks/correction-checks.py) on tool calls, replies and prompts.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,51 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/high-level-session-start.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
           }
         ]
       }
