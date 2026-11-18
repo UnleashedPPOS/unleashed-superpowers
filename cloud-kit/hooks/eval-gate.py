@@ -44,7 +44,7 @@ ADD = re.compile(GIT_OPTS + r"add\b")
 # Programs that run an eval. A command counts as an eval run only when one of these starts a simple command
 # whose words match the eval's `ran` regex (so `git commit -m "ran eval:triage"` or `grep eval:triage` don't).
 RUNNERS = {"npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "node", "tsx", "vitest", "jest", "pytest",
-           "python", "python3", "uv", "vault", "env", "timeout", "make"}
+           "python", "python3", "uv", "vault", "env", "timeout", "make", "bash", "sh", "zsh", "time", "nice", "sudo"}
 COMMIT_ALL = re.compile(r"\bcommit\b[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
 
 PROMPT_PATH = re.compile(
@@ -66,13 +66,14 @@ MODEL_ASSIGN = re.compile(
     # LLM_MODEL = "...", DEFAULT_MODEL: x, BEDROCK_FAST_MODEL=... (not DATA_MODEL_VERSION)
     r"\b(?:[A-Z]+_)*(?:LLM|AI|CHAT|DEFAULT|FALLBACK|PRIMARY|FAST|CHEAP|BEDROCK|GROQ|ANTHROPIC|OPENAI|OPENROUTER)"
     r"_MODEL(?:_ID)?\s*[:=]\s*['\"`\w]"
-    r"|\bmodel(?:_?[iI]d)?\s*[:=]\s*['\"`](?![A-Z][a-z]+['\"`])")  # model: 'x', model_id="..." (not model: "User")
+    r"|\bMODEL(?:_ID|_NAME)?\s*[:=]\s*['\"`]"                     # MODEL = "..."
+    r"|\bmodel(?:_?[iI]d)?\s*[:=]\s*['\"`]")                       # model: 'x', model_id="..." (not modelName)
 STRONG_PROMPT = re.compile(
     r"\bSYSTEM_PROMPT\b|\bsystem_?[pP]rompt\b|['\"]role['\"]\s*:\s*['\"]system['\"]|\brole:\s*['\"]system['\"]")
 YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b")
 PROMPT_WORD = re.compile(r"(?i)system|role|prompt|persona|instruction")
 LONG_YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b[^\n]{60,}")
-SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+)")
+SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+(?!\d|\s*/))")  # 47/50 or 94% (not a date 11/18/26)
 NONE_LINE = re.compile(r"(?i)\beval\s*:\s*none\b[^\n]{8,}")
 
 
@@ -290,14 +291,12 @@ def missing_runs(repo, cfg, top, groups, cmd=""):
 def add_specs(cmd):
     """Pathspecs of the `git add` in a command ([] = everything: -A, --all, -u or no path given)."""
     for _, words in segments(cmd):
-        line = " ".join(words)
-        m = ADD.search(line)
-        if not m:
+        if not ADD.search(" ".join(words)):
             continue
-        rest = shlex.split(line[m.end():]) if line[m.end():].strip() else []
+        rest = words[words.index("add") + 1:] if "add" in words else []
         if any(a in ("-A", "--all", "-u", "--update") for a in rest):
             return []
-        return [a for a in rest if not a.startswith("-")]
+        return [a for a in rest if not a.startswith("-")]  # words are already unquoted: keep spaces
     return []
 
 
@@ -360,8 +359,7 @@ def check_pr(repo, cfg, top, base, head, body):
     for n in groups:
         if n is None:
             continue
-        line = re.compile(r"(?i)\beval\s*\(\s*" + re.escape(n) + r"\s*(?:,[^)\n]*)?\)\s*:[^\n]*?"
-                          + SCORE.pattern)
+        line = re.compile(r"(?i)\beval\s*\(\s*" + re.escape(n) + r"\s*(?:,[^)\n]*)?\)\s*:\s*" + SCORE.pattern)
         ok = bool(line.search(body))
         if not ok:
             problems.append(f"- the PR body needs a score line for {n}, e.g. `Eval ({n}, offline): 47/50 (94%)`")

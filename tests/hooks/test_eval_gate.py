@@ -233,6 +233,8 @@ class PullRequest(Fixture):
         self.ran("PYTHONPATH=. uv run python -m evals.m3 qualify", d)
         r = self.bash("gh pr create --title t --body 'Eval of qualify prompt changed on 11/18'", d)
         self.assertIn("score line for qualify", r, "a date next to the name is not a score")
+        for body in ("Eval (qualify): ran on 11/18", "Eval (qualify, offline): 11/18/26"):
+            self.assertIsNotNone(self.bash(f"gh pr create --title t --body '{body}'", d), body)
 
 
 class Loopholes(Fixture):
@@ -289,6 +291,19 @@ class Loopholes(Fixture):
         write(d, "src/unleashed_leadgen/util.py", "def add(a, b):\n    return b + a\n")
         write(d, "src/unleashed_leadgen/hunters/gym_hunter/prompts/qualify.md", "Qualify gyms.\n")
         self.assertIsNone(self.bash("git add src/unleashed_leadgen/util.py && git commit -m 'refactor: add'", d))
+
+    def test_quoted_add_paths_with_spaces_or_quotes(self):
+        prompt = "export const SYSTEM_PROMPT = `\nAnswer as the coach.\nKeep it short.\n`;\n"
+        d = self.repo("unleashed-systems", {"src/space dir/agent.ts": prompt, "src/it's.ts": prompt})
+        for path in ("src/space dir/agent.ts", "src/it's.ts"):
+            write(d, path, prompt.replace("short", "warm"))
+            quoted = '"' + path + '"'
+            self.assertIsNotNone(self.bash(f"git add {quoted} && git commit -m 'fix: tone'", d), path)
+
+    def test_wrapped_eval_runs_are_recorded(self):
+        d = self.model_change()
+        self.ran("bash -c 'npm run eval:triage'", d)
+        self.assertIsNone(self.bash("git commit -am 'perf: x'", d))
 
     def test_fail_open_says_so(self):
         d = self.model_change()
