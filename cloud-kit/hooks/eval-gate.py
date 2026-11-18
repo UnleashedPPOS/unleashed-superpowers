@@ -46,6 +46,8 @@ ADD = re.compile(GIT_OPTS + r"add\b")
 RUNNERS = {"npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "node", "tsx", "vitest", "jest", "pytest",
            "python", "python3", "uv", "make"}
 WRAPPERS = {"time", "nice", "sudo", "env", "timeout", "nohup"}  # looked through: the next word is the program
+# Wrapper flags whose value is the next word (`sudo -u me`, `nice -n 5`, `timeout -s KILL 60`).
+WRAPPER_ARGS = {"sudo": ("-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t"), "nice": ("-n",), "timeout": ("-s", "-k"), "env": ("-u", "-C", "-S")}
 SHELLS = {"bash", "sh", "zsh"}
 COMMIT_ALL = re.compile(r"\bcommit\b[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
 
@@ -168,9 +170,10 @@ def program(words):
         if re.match(r"^\w+=", w[0]):
             w = w[1:]
         elif os.path.basename(w[0]) in WRAPPERS:
+            takes_value = WRAPPER_ARGS.get(os.path.basename(w[0]), ())
             w = w[1:]
             while w and (w[0].startswith("-") or re.fullmatch(r"[\d.]+[smhd]?", w[0])):
-                w = w[1:]
+                w = w[2:] if w[0] in takes_value else w[1:]
         elif os.path.basename(w[0]) == "vault" and "--" in w:
             w = w[w.index("--") + 1:]
         else:

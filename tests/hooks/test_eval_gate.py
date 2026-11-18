@@ -311,6 +311,13 @@ class Loopholes(Fixture):
         self.ran("bash -c 'npm run eval:triage'", d)
         self.assertIsNone(self.bash("git commit -am 'perf: x'", d))
 
+    def test_wrapper_flag_values_are_skipped(self):
+        d = self.model_change()
+        for cmd in ("sudo -u me npm run eval:triage", "nice -n 5 npm run eval:triage",
+                    "timeout -s KILL 900 npm run eval:triage"):
+            self.assertIsNone(self.bash(cmd + " && git commit -am x", d), cmd)
+        self.assertIsNotNone(self.bash("sudo -u me grep eval:triage f && git commit -am x", d))
+
     def test_fail_open_says_so(self):
         d = self.model_change()
         r = subprocess.run([sys.executable, HOOK], capture_output=True, text=True, timeout=30,
