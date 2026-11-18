@@ -60,8 +60,10 @@ A commit or PR that changes an LLM prompt or model choice in these repos runs th
 
 What counts as a prompt or model change:
 - a prompt path (`prompts/`, `*_prompt.py`, `system_prompt`) or an eval's own data;
-- an LLM file inside an eval's area;
+- an LLM file inside an eval's area, or a file anywhere that builds a system prompt;
 - a changed line with a model id, a model assignment or a prompt string, outside tests and docs.
+
+An eval counts as run only when a runner (`npm`, `bun`, `deno`, `pytest`, `uv`, `vault run` and the like) starts the command; naming it in a commit message or a grep does not.
 
 The hook is `cloud-kit/hooks/eval-gate.py`, and its registry is `cloud-kit/hooks/eval-gate.json`. When you edit a row below, update the matching registry entry too; the test checks that the two agree. Off switch, for the founder only: `EVAL_GATE_OFF=1`.
 

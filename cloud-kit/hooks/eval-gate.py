@@ -21,6 +21,10 @@ What counts as a prompt or model change:
     a registered eval's `paths` (which includes the eval's golden data), or
   - an added or removed line, outside tests and docs, with a model id, a model assignment or a prompt
     string (SYSTEM_PROMPT, role "system", "You are a ...").
+  - a code file that builds a system prompt (an edit in the middle of a prompt string has no marker).
+
+An eval "ran" only when a runner (npm, bun, deno, pytest, uv, vault ...) starts a simple command whose words
+match the eval's `ran` regex; `eval && git commit` counts, a commit message or a grep naming it does not.
 
 Unknown repos (anything not in eval-gate.json) are never touched. Fails OPEN on unreadable input or a
 git error (a gate bug must not block every commit). Off switch for the founder: EVAL_GATE_OFF=1.
@@ -33,9 +37,14 @@ REGISTRY = os.environ.get("EVAL_GATE_REGISTRY") or os.path.join(HERE, "eval-gate
 STATE = os.environ.get("EVAL_GATE_STATE") or os.path.expanduser("~/.claude/state/eval-gate.json")
 
 PR_TOOL = re.compile(r"^mcp__.*github.*__create_pull_request$")
-COMMIT = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?commit\b")
+GIT_OPTS = r"\bgit(?:\s+(?:-[cC]\s+\S+|--[\w-]+(?:=\S+)?|-[a-zA-Z]))*\s+"  # git -c k=v --no-pager -C x
+COMMIT = re.compile(GIT_OPTS + r"commit\b")
 PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b")
-ADD = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?add\b")
+ADD = re.compile(GIT_OPTS + r"add\b")
+# Programs that run an eval. A command counts as an eval run only when one of these starts a simple command
+# whose words match the eval's `ran` regex (so `git commit -m "ran eval:triage"` or `grep eval:triage` don't).
+RUNNERS = {"npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "node", "tsx", "vitest", "jest", "pytest",
+           "python", "python3", "uv", "vault", "env", "timeout", "make"}
 COMMIT_ALL = re.compile(r"\bcommit\b[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
 
 PROMPT_PATH = re.compile(
@@ -54,11 +63,15 @@ MODEL_ID = re.compile(
     r"|qwen\d?[\w.-]*\d[\w.-]*|(?:us\.)?amazon\.nova[\w.:-]*|gemini-[\w.-]+"
     r"|meta-llama/[\w.-]+|llama-?3[\w.-]*|moonshotai/[\w.-]+|kimi-k2[\w.-]*", re.I)
 MODEL_ASSIGN = re.compile(
-    r"\b[A-Z_]*MODEL[A-Z_]*\s*[:=]\s*['\"`\w]"                 # LLM_MODEL = "...", DEFAULT_MODEL: x
-    r"|\bmodel(?:_?[iI]d|_?[nN]ame)?\s*[:=]\s*['\"`]")          # model: '...', model_id="..."
-PROMPT_STR = re.compile(
-    r"\bSYSTEM_PROMPT\b|\bsystem_?[pP]rompt\b|['\"]role['\"]\s*:\s*['\"]system['\"]|\brole:\s*['\"]system['\"]"
-    r"|\bYou are (?:a|an|the)\b")
+    # LLM_MODEL = "...", DEFAULT_MODEL: x, BEDROCK_FAST_MODEL=... (not DATA_MODEL_VERSION)
+    r"\b(?:[A-Z]+_)*(?:LLM|AI|CHAT|DEFAULT|FALLBACK|PRIMARY|FAST|CHEAP|BEDROCK|GROQ|ANTHROPIC|OPENAI|OPENROUTER)"
+    r"_MODEL(?:_ID)?\s*[:=]\s*['\"`\w]"
+    r"|\bmodel(?:_?[iI]d)?\s*[:=]\s*['\"`](?![A-Z][a-z]+['\"`])")  # model: 'x', model_id="..." (not model: "User")
+STRONG_PROMPT = re.compile(
+    r"\bSYSTEM_PROMPT\b|\bsystem_?[pP]rompt\b|['\"]role['\"]\s*:\s*['\"]system['\"]|\brole:\s*['\"]system['\"]")
+YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b")
+PROMPT_WORD = re.compile(r"(?i)system|role|prompt|persona|instruction")
+LONG_YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b[^\n]{60,}")
 SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+)")
 NONE_LINE = re.compile(r"(?i)\beval\s*:\s*none\b[^\n]{8,}")
 
@@ -103,22 +116,68 @@ def repo_of(d):
 
 
 def target_dir(cmd, cwd):
-    """The directory a Bash command acts on: a leading `cd X &&`, else `git -C X`, else cwd."""
-    m = re.match(r"\s*cd\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)\s*(?:&&|;)", cmd)
-    if not m:
-        m = re.search(r"\bgit\s+-C\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", cmd)
-    if m:
-        p = os.path.expanduser(m.group(1).strip("'\""))
-        return p if os.path.isabs(p) else os.path.join(cwd, p)
-    return cwd
+    """The directory a Bash command acts on: a `cd X &&` (also inside a subshell), then `git -C X`, else cwd."""
+    d = cwd
+    arg = r"(\"[^\"]+\"|'[^']+'|[^\s;&|()]+)"
+    for pat in (r"(?:^|[(;&|]\s*)cd\s+" + arg + r"\s*(?:&&|;)",
+                r"\bgit(?:\s+(?:-c\s+\S+|--[\w-]+(?:=\S+)?))*\s+-C\s+" + arg):
+        m = re.search(pat, cmd)
+        if m:
+            p = os.path.expanduser(m.group(1).strip("'\""))
+            d = p if os.path.isabs(p) else os.path.join(d, p)
+    return d
+
+
+def segments(cmd):
+    """The simple commands in a shell line, as [(separator before it, [words])]; [] if it can't be parsed."""
+    try:
+        lx = shlex.shlex(cmd.replace("\n", " ; "), posix=True, punctuation_chars=True)
+        lx.whitespace_split = True
+        toks = list(lx)
+    except ValueError:
+        return []
+    out, cur, sep = [], [], None
+    for t in toks:
+        if t and set(t) <= set("();&|"):
+            if cur:
+                out.append((sep, cur))
+            cur, sep = [], (t.strip("()") or sep or ";")
+        else:
+            cur.append(t)
+    if cur:
+        out.append((sep, cur))
+    return out
+
+
+def runs(words, e):
+    """True when one simple command actually runs eval `e` (it starts with an eval runner)."""
+    w = [x for x in words if not re.match(r"^\w+=", x)]
+    return bool(w) and os.path.basename(w[0]) in RUNNERS and bool(re.search(e["ran"], " ".join(w)))
+
+
+def ran_before_commit(cmd, e):
+    """True when `eval && ... && git commit` runs eval `e` first (the commit only happens if the eval passed)."""
+    chain = []
+    for sep, words in segments(cmd):
+        if sep not in (None, "&&"):
+            chain = []
+        if COMMIT.search(" ".join(words)):
+            return any(runs(w, e) for w in chain)
+        chain.append(words)
+    return False
 
 
 def parse_diff(text):
     """{path: [changed lines]} from a -U0 unified diff."""
-    out, cur = {}, None
+    out, cur, header = {}, None, False
     for line in text.splitlines():
         if line.startswith("diff --git "):
-            cur = None
+            cur, header = None, True
+        elif line.startswith("@@"):
+            header = False
+        elif not header:
+            if cur and line[:1] in "+-":
+                out[cur].append(line[1:])
         elif line.startswith("+++ "):
             p = line[4:].strip()
             if p != "/dev/null":
@@ -129,8 +188,6 @@ def parse_diff(text):
             if p != "/dev/null":
                 cur = p[2:] if p.startswith("a/") else p
                 out.setdefault(cur, [])
-        elif cur and line[:1] in "+-":
-            out[cur].append(line[1:])
     return out
 
 
@@ -145,18 +202,22 @@ def why_llm(path, lines):
     for l in lines:
         if MODEL_ID.search(l) or MODEL_ASSIGN.search(l):
             return "model id"
-        if PROMPT_STR.search(l):
+        if STRONG_PROMPT.search(l) or (YOU_ARE.search(l) and (len(l) >= 80 or PROMPT_WORD.search(l))):
             return "prompt string"
     return None
 
 
-def is_llm_file(top, path):
+def is_llm_file(top, path, strict=False):
+    """Whether the whole file builds a prompt or picks a model. strict (outside every eval area): only a
+    system-prompt marker or a long "You are a ..." line counts, so a file that merely names a model doesn't."""
     try:
         with open(os.path.join(top, path), errors="replace") as f:
             text = f.read(300_000)
     except OSError:
         return False
-    return bool(PROMPT_STR.search(text) or MODEL_ID.search(text) or MODEL_ASSIGN.search(text))
+    if strict:
+        return bool(STRONG_PROMPT.search(text) or LONG_YOU_ARE.search(text))
+    return bool(STRONG_PROMPT.search(text) or YOU_ARE.search(text) or MODEL_ID.search(text) or MODEL_ASSIGN.search(text))
 
 
 def classify(cfg, changes, top):
@@ -164,7 +225,8 @@ def classify(cfg, changes, top):
 
     A file inside an eval's `always` area (its golden data, its own code) always counts. A file inside an
     eval's `paths` counts when it is an LLM file at all (an edit in the middle of a long prompt has no
-    marker on the changed line). Anywhere else the path or the changed lines must show it."""
+    marker on the changed line). Anywhere else the path or the changed lines must show it, or the file must
+    build a system prompt (an edit in the middle of a prompt string)."""
     out = {}
     for path, lines in sorted(changes.items()):
         ev = next((e for e in cfg["evals"] if re.search(e["paths"], path)), None)
@@ -172,7 +234,8 @@ def classify(cfg, changes, top):
             reason = "eval data"
         else:
             reason = why_llm(path, lines)
-            if not reason and ev and not (TEST_DIR.search(path) or DOC_FILE.search(path)) and is_llm_file(top, path):
+            if not reason and not (TEST_DIR.search(path) or DOC_FILE.search(path)) \
+                    and is_llm_file(top, path, strict=ev is None):
                 reason = "LLM file"
         if not reason:
             continue
@@ -209,14 +272,14 @@ def files_list(items, n=6):
 
 
 def missing_runs(repo, cfg, top, groups, cmd=""):
-    """Evals that have not run since their files last changed (a command that runs the eval itself counts)."""
+    """Evals that have not run since their files last changed (`eval && git commit` counts as a run)."""
     state = load_state().get(repo, {})
     need = []
     for name, items in groups.items():
         if name is None:
             continue
         e = next(x for x in cfg["evals"] if x["name"] == name)
-        if cmd and re.search(e["ran"], cmd):
+        if cmd and ran_before_commit(cmd, e):
             continue
         ran = state.get(name, {}).get("ts", 0)
         if ran < newest_mtime(top, [p for p, _ in items]):
@@ -224,14 +287,31 @@ def missing_runs(repo, cfg, top, groups, cmd=""):
     return need
 
 
-def commit_changes(top, cmd):
+def add_specs(cmd):
+    """Pathspecs of the `git add` in a command ([] = everything: -A, --all, -u or no path given)."""
+    for _, words in segments(cmd):
+        line = " ".join(words)
+        m = ADD.search(line)
+        if not m:
+            continue
+        rest = shlex.split(line[m.end():]) if line[m.end():].strip() else []
+        if any(a in ("-A", "--all", "-u", "--update") for a in rest):
+            return []
+        return [a for a in rest if not a.startswith("-")]
+    return []
+
+
+def commit_changes(top, cmd, d=None):
     staged = sh(["git", "diff", "--cached", "-U0", "--no-color", "--no-ext-diff"], top)
     changes = parse_diff(staged)
     if ADD.search(cmd) or COMMIT_ALL.search(cmd):
-        for p, ls in parse_diff(sh(["git", "diff", "-U0", "--no-color", "--no-ext-diff"], top)).items():
+        specs = add_specs(cmd) if ADD.search(cmd) and not COMMIT_ALL.search(cmd) else []
+        d = d or top  # pathspecs are relative to where the command runs; diff output is repo-relative
+        for p, ls in parse_diff(sh(["git", "diff", "-U0", "--no-color", "--no-ext-diff", "--", *specs], d)).items():
             changes.setdefault(p, []).extend(ls)
         if ADD.search(cmd):
-            for p in sh(["git", "ls-files", "--others", "--exclude-standard"], top).splitlines():
+            for p in sh(["git", "ls-files", "--others", "--exclude-standard", "--full-name", "--", *specs],
+                        d).splitlines():
                 try:
                     with open(os.path.join(top, p), errors="replace") as f:
                         changes.setdefault(p, []).extend(f.read(200_000).splitlines())
@@ -257,8 +337,8 @@ def default_base(top):
         return "main"
 
 
-def check_commit(repo, cfg, top, cmd):
-    groups = classify(cfg, commit_changes(top, cmd), top)
+def check_commit(repo, cfg, top, cmd, d=None):
+    groups = classify(cfg, commit_changes(top, cmd, d), top)
     need = missing_runs(repo, cfg, top, groups, cmd)
     if not need:
         return None
@@ -280,8 +360,9 @@ def check_pr(repo, cfg, top, base, head, body):
     for n in groups:
         if n is None:
             continue
-        ok = any(n.lower() in l.lower() and re.search(r"(?i)\beval", l) and SCORE.search(l)
-                 for l in body.splitlines())
+        line = re.compile(r"(?i)\beval\s*\(\s*" + re.escape(n) + r"\s*(?:,[^)\n]*)?\)\s*:[^\n]*?"
+                          + SCORE.pattern)
+        ok = bool(line.search(body))
         if not ok:
             problems.append(f"- the PR body needs a score line for {n}, e.g. `Eval ({n}, offline): 47/50 (94%)`")
     if None in groups and not NONE_LINE.search(body):
@@ -349,7 +430,7 @@ def pre(tool, inp, cwd, reg):
         if repo not in reg:
             return None
         if is_commit:
-            r = check_commit(repo, reg[repo], top, cmd)
+            r = check_commit(repo, reg[repo], top, cmd, d)
             if r:
                 return r
         if is_pr:
@@ -378,7 +459,7 @@ def post(tool, inp, resp, cwd, reg):
     repo, top = repo_of(target_dir(cmd, cwd))
     if repo not in reg:
         return
-    hits = [e["name"] for e in reg[repo]["evals"] if re.search(e["ran"], cmd)]
+    hits = [e["name"] for e in reg[repo]["evals"] if any(runs(w, e) for _, w in segments(cmd))]
     if not hits:
         return
     out = ""
@@ -408,7 +489,9 @@ def main():
             post(tool, inp, data.get("tool_response"), cwd, reg)
             return 0
         reason = pre(tool, inp, cwd, reg)
-    except Exception:
+    except Exception as e:  # fail open, but say so: a silent pass looks like a clean check
+        print(f"eval-gate: check skipped ({type(e).__name__}: {str(e)[:120]}); run the eval by hand",
+              file=sys.stderr)
         return 0
     if reason:
         print(json.dumps({"hookSpecificOutput": {

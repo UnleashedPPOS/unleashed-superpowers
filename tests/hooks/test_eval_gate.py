@@ -227,6 +227,78 @@ class PullRequest(Fixture):
         self.assertIsNone(self.hook(tool, inp, d))
         self.assertIsNone(self.hook(tool, {**inp, "repo": "some-other-repo", "body": ""}, d))
 
+    def test_score_line_must_be_in_the_eval_format(self):
+        d = self.leadgen()
+        self.branch(d, QUALIFY, "Score 0-100.\n")
+        self.ran("PYTHONPATH=. uv run python -m evals.m3 qualify", d)
+        r = self.bash("gh pr create --title t --body 'Eval of qualify prompt changed on 11/18'", d)
+        self.assertIn("score line for qualify", r, "a date next to the name is not a score")
+
+
+class Loopholes(Fixture):
+    """Review findings (Opus review of PR #36): each was a way past the gate or a false block."""
+
+    def model_change(self):
+        d = self.systems()
+        write(d, "src/lib/llm/client.ts", "export const MODEL = 'openai.gpt-oss-20b-1:0';\n")
+        return d
+
+    def test_mentioning_the_eval_is_not_running_it(self):
+        d = self.model_change()
+        self.assertIsNotNone(self.bash("git commit -am 'perf: cheaper model, ran eval:triage'", d))
+        self.ran("grep eval:triage package.json", d)
+        self.assertFalse(os.path.exists(self.state), "a grep is not an eval run")
+        self.assertIsNotNone(self.bash("git commit -am 'perf: cheaper model'", d))
+        self.ran("timeout 900 npm run eval:triage 2>&1 | tail -5", d)
+        self.assertIsNone(self.bash("git commit -am 'perf: cheaper model'", d))
+
+    def test_eval_after_the_commit_does_not_count(self):
+        d = self.model_change()
+        self.assertIsNotNone(self.bash("git commit -am 'perf: x'; npm run eval:triage", d))
+        self.assertIsNotNone(self.bash("npm run eval:triage || git commit -am 'perf: x'", d))
+
+    def test_removed_sql_style_comment_does_not_hide_the_change(self):
+        d = self.repo("unleashed-systems", {"src/lib/llm/models.lua": "-- old note\nLLM_MODEL = 'a'\n"})
+        write(d, "src/lib/llm/models.lua", "LLM_MODEL = 'openai.gpt-oss-20b-1:0'\n")
+        self.assertIsNotNone(self.bash("git commit -am 'perf: model'", d))
+
+    def test_git_options_and_subshells_are_still_commits(self):
+        d = self.model_change()
+        for cmd in ("git -c core.quotepath=off commit -am x", "git --no-pager commit -am x",
+                    f"git -C {d} commit -am x"):
+            self.assertIsNotNone(self.bash(cmd, d), cmd)
+        self.assertIsNotNone(self.bash(f"(cd {d} && git commit -am x)", self.tmp.name))
+
+    def test_mid_prompt_edit_outside_every_eval_area(self):
+        prompt = "export const SYSTEM_PROMPT = `\nAnswer as the coach.\nKeep it short.\n`;\n"
+        d = self.repo("unleashed-systems", {"src/lib/brain/compose.ts": prompt})
+        write(d, "src/lib/brain/compose.ts", prompt.replace("short", "warm"))
+        r = self.bash("git commit -am 'fix: tone'", d)
+        self.assertIsNotNone(r)
+        self.assertIn("LLM file", r)
+
+    def test_ordinary_code_that_looks_like_llm_code_is_silent(self):
+        d = self.systems()
+        write(d, "src/lib/db/schema.ts",
+              "export const DATA_MODEL_VERSION = 3;\nUser.init({}, { modelName: \"User\" });\n")
+        write(d, "src/app/crew.tsx", "export default () => <Text>You are the owner of this crew.</Text>;\n")
+        self.assertIsNone(self.bash("git add -A && git commit -m 'feat: crew'", d))
+
+    def test_git_add_of_one_file_does_not_scan_other_untracked_files(self):
+        d = self.leadgen()
+        write(d, "src/unleashed_leadgen/util.py", "def add(a, b):\n    return b + a\n")
+        write(d, "src/unleashed_leadgen/hunters/gym_hunter/prompts/qualify.md", "Qualify gyms.\n")
+        self.assertIsNone(self.bash("git add src/unleashed_leadgen/util.py && git commit -m 'refactor: add'", d))
+
+    def test_fail_open_says_so(self):
+        d = self.model_change()
+        r = subprocess.run([sys.executable, HOOK], capture_output=True, text=True, timeout=30,
+                           input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -am x"},
+                                             "cwd": d}),
+                           env={**self.env, "EVAL_GATE_REGISTRY": os.path.join(d, "missing.json")})
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        self.assertIn("check skipped", r.stderr)
+
 
 class Safety(Fixture):
     def run_raw(self, stdin, env=None):
