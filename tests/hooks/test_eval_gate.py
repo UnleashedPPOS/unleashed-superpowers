@@ -302,6 +302,12 @@ class Loopholes(Fixture):
 
     def test_wrapped_eval_runs_are_recorded(self):
         d = self.model_change()
+        for cmd in ("sh -c 'echo eval:triage'", "sudo grep eval:triage f", "time echo eval:triage",
+                    "sh script.sh eval:triage", "vault run --keys K -- echo eval:triage"):
+            self.ran(cmd, d)
+            self.assertFalse(os.path.exists(self.state), cmd)
+        self.assertIsNotNone(self.bash("bash -c 'echo eval:triage' && git commit -am x", d))
+        self.assertIsNone(self.bash("bash -c 'npm run eval:triage && git commit -am x'", d))
         self.ran("bash -c 'npm run eval:triage'", d)
         self.assertIsNone(self.bash("git commit -am 'perf: x'", d))
 

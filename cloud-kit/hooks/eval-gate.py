@@ -44,7 +44,9 @@ ADD = re.compile(GIT_OPTS + r"add\b")
 # Programs that run an eval. A command counts as an eval run only when one of these starts a simple command
 # whose words match the eval's `ran` regex (so `git commit -m "ran eval:triage"` or `grep eval:triage` don't).
 RUNNERS = {"npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "node", "tsx", "vitest", "jest", "pytest",
-           "python", "python3", "uv", "vault", "env", "timeout", "make", "bash", "sh", "zsh", "time", "nice", "sudo"}
+           "python", "python3", "uv", "make"}
+WRAPPERS = {"time", "nice", "sudo", "env", "timeout", "nohup"}  # looked through: the next word is the program
+SHELLS = {"bash", "sh", "zsh"}
 COMMIT_ALL = re.compile(r"\bcommit\b[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
 
 PROMPT_PATH = re.compile(
@@ -67,7 +69,7 @@ MODEL_ASSIGN = re.compile(
     r"\b(?:[A-Z]+_)*(?:LLM|AI|CHAT|DEFAULT|FALLBACK|PRIMARY|FAST|CHEAP|BEDROCK|GROQ|ANTHROPIC|OPENAI|OPENROUTER)"
     r"_MODEL(?:_ID)?\s*[:=]\s*['\"`\w]"
     r"|\bMODEL(?:_ID|_NAME)?\s*[:=]\s*['\"`]"                     # MODEL = "..."
-    r"|\bmodel(?:_?[iI]d)?\s*[:=]\s*['\"`]")                       # model: 'x', model_id="..." (not modelName)
+    r"|\bmodel(?:_?[iI]d)?\s*[:=]\s*['\"`](?![A-Z][a-z]+['\"`])")  # model: 'x', model_id="..." (not model: "User")
 STRONG_PROMPT = re.compile(
     r"\bSYSTEM_PROMPT\b|\bsystem_?[pP]rompt\b|['\"]role['\"]\s*:\s*['\"]system['\"]|\brole:\s*['\"]system['\"]")
 YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b")
@@ -150,16 +152,60 @@ def segments(cmd):
     return out
 
 
-def runs(words, e):
-    """True when one simple command actually runs eval `e` (it starts with an eval runner)."""
-    w = [x for x in words if not re.match(r"^\w+=", x)]
+def shell_c(words):
+    """The script of `bash -c '...'` / `sh -lc '...'`, or None."""
+    if words and os.path.basename(words[0]) in SHELLS:
+        for i, x in enumerate(words[1:-1], 1):
+            if re.fullmatch(r"-\w*c\w*", x):
+                return words[i + 1]
+    return None
+
+
+def program(words):
+    """The words from the real program on: past VAR=x, wrappers (time, sudo, timeout 900) and `vault run ... --`."""
+    w = list(words)
+    while w:
+        if re.match(r"^\w+=", w[0]):
+            w = w[1:]
+        elif os.path.basename(w[0]) in WRAPPERS:
+            w = w[1:]
+            while w and (w[0].startswith("-") or re.fullmatch(r"[\d.]+[smhd]?", w[0])):
+                w = w[1:]
+        elif os.path.basename(w[0]) == "vault" and "--" in w:
+            w = w[w.index("--") + 1:]
+        else:
+            break
+    return w
+
+
+def runs(words, e, depth=0):
+    """True when one simple command actually runs eval `e`: an eval runner (npm, bun, deno, pytest ...) is the
+    program, not a mention in a commit message, a grep or an echo. `bash -c '...'` is looked inside."""
+    w = program(words)
+    script = shell_c(w)
+    if script is not None:
+        return depth < 3 and any(runs(x, e, depth + 1) for _, x in segments(script))
     return bool(w) and os.path.basename(w[0]) in RUNNERS and bool(re.search(e["ran"], " ".join(w)))
+
+
+def flat_segments(cmd, depth=0):
+    """segments(), with each `bash -c '...'` replaced by the commands inside it."""
+    out = []
+    for sep, words in segments(cmd):
+        script = shell_c(program(words))
+        inner = flat_segments(script, depth + 1) if script is not None and depth < 3 else []
+        if inner:
+            out.append((sep, inner[0][1]))
+            out.extend(inner[1:])
+        else:
+            out.append((sep, words))
+    return out
 
 
 def ran_before_commit(cmd, e):
     """True when `eval && ... && git commit` runs eval `e` first (the commit only happens if the eval passed)."""
     chain = []
-    for sep, words in segments(cmd):
+    for sep, words in flat_segments(cmd):
         if sep not in (None, "&&"):
             chain = []
         if COMMIT.search(" ".join(words)):
