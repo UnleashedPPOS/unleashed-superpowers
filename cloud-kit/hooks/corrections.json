@@ -1129,6 +1129,32 @@
    "anchor": "Pick the cheapest model that passes"
   },
   {
+   "id": "prompt-change-needs-eval",
+   "rule": "A commit or PR that changes an LLM prompt or model in a product repo runs that repo's eval first; the PR body carries the score.",
+   "source": "council audit 2026-11-16 section 5 (outcome hooks)",
+   "class": "check",
+   "home": "skills/llm-provider-chain/SKILL.md",
+   "anchor": "runs the matching eval first",
+   "check": "external:cloud-kit/hooks/eval-gate.py"
+  },
+  {
+   "id": "goal-shaped-briefs",
+   "rule": "Lane, routine and sub-agent briefs state goal, constraints and the success check, not step lists.",
+   "source": "council audit 2026-11-16 section 5 (goal-shaped briefs)",
+   "class": "prose",
+   "home": "cloud-kit/rules/token-discipline.md",
+   "anchor": "Briefs give goal, constraints"
+  },
+  {
+   "id": "monthly-prune-routine",
+   "rule": "The corrections registry is pruned monthly by an Opus routine with a stated sub-agent cap.",
+   "source": "council audit 2026-11-16 section 5 (monthly prune, from #35)",
+   "class": "check",
+   "home": "docs/learning/monthly-prune.md",
+   "anchor": "checks that the booked definition passes model-guard",
+   "check": "external:tests/learning/test_monthly_prune.py"
+  },
+  {
    "id": "check-provider-first",
    "rule": "Check which provider a call hits before adding or changing it.",
    "source": "rules/llm-provider-chain.md",

@@ -113,6 +113,11 @@ for ev in ("PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit"):
     ensure(ev, "/.claude/hooks/correction-checks.py", f'"{cl}/hooks/correction-checks.py"', timeout=10)
 ensure("PreToolUse", "/.claude/hooks/model-guard.py", f'"{cl}/hooks/model-guard.py"',
        matcher="Agent|Task|RemoteTrigger|Workflow|mcp__ccd_session__start_session|mcp__scheduled-tasks__.*", timeout=10)
+# A prompt or model change in a product repo needs its eval run and the score in the PR body
+# (registry: hooks/eval-gate.json). PostToolUse records eval runs; PreToolUse gates commits and PRs.
+ensure("PreToolUse", "/.claude/hooks/eval-gate.py", f'"{cl}/hooks/eval-gate.py"',
+       matcher="Bash|mcp__.*github.*__create_pull_request", timeout=15)
+ensure("PostToolUse", "/.claude/hooks/eval-gate.py", f'"{cl}/hooks/eval-gate.py"', matcher="Bash", timeout=10)
 ensure("SessionStart", "/cloud-kit/install.sh | bash", f"curl -fsSL {raw}/cloud-kit/install.sh | bash >/dev/null 2>&1",
        timeout=600, **{"async": True})
 fd, tmp = tempfile.mkstemp(dir=cl, prefix=".settings.")

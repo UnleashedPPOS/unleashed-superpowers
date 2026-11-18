@@ -9,7 +9,7 @@ Every founder correction from the always-loaded rules and the High-Level output 
 - **eval**: behaviour a regex can't judge; a `claude plugin eval` case under `evals/`.
 - **prose**: judgement; stays as a rule line. The *Home* column is the one place it lives.
 
-Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded word count: `python3 scripts/corrections.py words`.
+Totals: 105 corrections; 36 checks, 9 evals, 60 prose. Always-loaded word count: `python3 scripts/corrections.py words`.
 
 | ID | Rule | Class | Enforced by | Home | Source |
 |---|---|---|---|---|---|
@@ -43,10 +43,12 @@ Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded word count:
 | `permission-question-in-reply` | Never ask permission for work already asked for (incl. "want me to ship-check?"). | check | `permission-question-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md (2026-10-08) + Output |
 | `time-estimate-in-reply` | Never estimate duration. | check | `time-estimate-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/working-style.md (HARD RULE 2026-10-08) |
 | `unverified-url-in-reply` | Every link given must be live: opened this session or a known dashboard deep link. | check | `unverified-url-in-reply` (reply → block) | `cloud-kit/rules/working-style.md` | rules/user-handoffs.md §3/§6 + brief 'linking an un-live URL' |
+| `monthly-prune-routine` | The corrections registry is pruned monthly by an Opus routine with a stated sub-agent cap. | check | tests/learning/test_monthly_prune.py | `docs/learning/monthly-prune.md` | council audit 2026-11-16 section 5 (monthly prune, from #35) |
 | `multiple-questions-in-reply` | At most one question per turn. | check | `multiple-questions-in-reply` (reply → block) | `output-styles/high-level.md` | rules/working-style.md + output style |
 | `narration-while-working` | No narration while working: zero chat text between tool calls. | check | `narration-while-working` (turn → warn) | `output-styles/high-level.md` | output-styles/high-level.md (founder 2026-10-15) |
 | `status-in-chat` | Once a status page exists, status goes only on the page, not in chat. | check | `status-in-chat` (reply → block) | `output-styles/high-level.md` | output-styles/high-level.md (HARD RULE 2026-10-10) + brief |
 | `status-page-heartbeat` | Long work republishes the status page about every 30 min. | check | cloud-kit/hooks/status-page-heartbeat.py | `output-styles/high-level.md` | output-styles/high-level.md |
+| `prompt-change-needs-eval` | A commit or PR that changes an LLM prompt or model in a product repo runs that repo's eval first; the PR body carries the score. | check | cloud-kit/hooks/eval-gate.py | `skills/llm-provider-chain/SKILL.md` | council audit 2026-11-16 section 5 (outcome hooks) |
 | `flaky-not-diagnosis` | 'Flaky' is not a diagnosis: reproduce, fix the cause, prove it. | eval | `evals/red-team-flaky` | `cloud-kit/rules/working-style.md` | rules/working-style.md |
 | `no-reply-on-no-change` | Background notifications with no change get no reply. | eval | `evals/high-level-status-on-page` | `cloud-kit/rules/working-style.md` | rules/working-style.md |
 | `prompt-is-floor` | The prompt is a floor: build the missing states, flows, copy, docs and tests. | eval | `evals/dod-verdict-first` | `cloud-kit/rules/working-style.md` | rules/working-style.md |
@@ -79,6 +81,7 @@ Totals: 102 corrections; 34 checks, 9 evals, 59 prose. Always-loaded word count:
 | `cloud-first` | Cloud first; at most one local sub-agent. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `effort-medium` | Effort medium by default; high only when genuinely hard. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `fresh-chat-next-job` | Start the next job in a fresh chat with a handoff. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
+| `goal-shaped-briefs` | Lane, routine and sub-agent briefs state goal, constraints and the success check, not step lists. | prose | prose | `cloud-kit/rules/token-discipline.md` | council audit 2026-11-16 section 5 (goal-shaped briefs) |
 | `lean-context` | No whole-file reads of big files; filter output; CLIs over connectors. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |
 | `model-table` | Plan in Opus, build in Sonnet (Haiku for mechanical), review and ship-check in Opus. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md (founder HARD RULE 2026-11-16) |
 | `no-still-waiting` | Never send 'still waiting' turns; blocked is said once. | prose | prose | `cloud-kit/rules/token-discipline.md` | rules/token-discipline.md |

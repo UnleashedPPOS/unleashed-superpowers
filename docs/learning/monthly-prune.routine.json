@@ -1,0 +1,36 @@
+{
+  "note": "Booking definition for the monthly prune routine (RemoteTrigger create input). The event content is the ```text block in docs/learning/monthly-prune.md (one home for the prompt). tests/learning/test_monthly_prune.py checks it passes model-guard.",
+  "tool": "RemoteTrigger",
+  "action": "create",
+  "prompt_file": "docs/learning/monthly-prune.md",
+  "body": {
+    "name": "Monthly corrections prune (unleashed-superpowers)",
+    "cron_expression": "CRON_TZ=Europe/London 47 10 1 * *",
+    "enabled": true,
+    "job_config": {
+      "ccr": {
+        "session_context": {
+          "model": "claude-opus-5-5",
+          "sources": [
+            {
+              "git_repository": {
+                "url": "https://github.com/UnleashedPPOS/unleashed-superpowers"
+              }
+            }
+          ]
+        },
+        "events": [
+          {
+            "data": {
+              "type": "user",
+              "message": {
+                "role": "user",
+                "content": "<the text block from prompt_file>"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -27,7 +27,7 @@ Why: every turn re-reads the whole chat, so cost ~ turns x context size. Levers:
 | `opus-thinker` | opus | Planning, review + ship-check, and genuinely hard calls: design, non-obvious root causes, audits/red-team, risky decisions. Never routine review fan-out |
 
 - Main chat defaults to Sonnet; Opus only for planning, review or a hard stretch, then back. A main chat not on Opus orchestrates and sends hard thinking to `opus-thinker`.
-- Unsure which tier: pick the cheaper one and escalate one tier only when the result is weak or the agent says it's unsure. Haiku briefs must be self-contained (files, change, how to verify); a vague brief goes to Sonnet.
+- Unsure which tier: pick the cheaper one and escalate one tier only when the result is weak or the agent says it's unsure. Briefs give goal, constraints (money, safety, model policy) and the success check, not steps (skill `where-work-runs`).
 - Effort medium by default; `high` only when hard (unclear root cause, security/money/prod data); `xhigh` for the hardest only. Never raise by habit.
 - Sub-agents work silently and return ONE result under 300 words; not for a 1-3 call lookup. Ad-hoc agents must pass `model:`. Fork only when the task needs this chat's context and context < ~60k.
 - Cloud first: work that can run in the cloud runs as a one-shot cloud routine; stay local only for vault secrets, DB/deploy CLIs, ssh and the built-in browser; at most ONE local sub-agent at a time (8GB laptop).
