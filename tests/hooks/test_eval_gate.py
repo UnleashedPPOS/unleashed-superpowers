@@ -296,6 +296,24 @@ class MentionsAndStatus(Fixture):
         st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
         self.assertTrue(st["ok"])
 
+    def test_masked_exit_score_read_from_a_file_is_not_trusted(self):
+        d = self.staged()
+        for cmd in ("PYTHONPATH=. uv run python -m evals.m3 qualify; grep -h . /tmp/fake.txt",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; tail -1 /tmp/fake.txt",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | head -c 100 /tmp/fake.txt",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -f /tmp/pats"):
+            self.bash(cmd, d, event="PostToolUse", resp={"stdout": "47/50", "stderr": "", "exit_code": 0})
+            st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+            self.assertFalse(st["ok"], cmd)
+
+    def test_masked_exit_score_through_tail_and_grep_is_trusted(self):
+        d = self.staged()
+        for cmd in ("PYTHONPATH=. uv run python -m evals.m3 qualify 2>&1 | tail -5",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -i score"):
+            self.bash(cmd, d, event="PostToolUse", resp={"stdout": "score 47/50", "stderr": "", "exit_code": 0})
+            st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+            self.assertTrue(st["ok"], cmd)
+
     def test_passing_run_records_score(self):
         d = self.staged()
         self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify", d, event="PostToolUse",

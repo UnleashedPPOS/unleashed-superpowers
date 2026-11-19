@@ -547,8 +547,25 @@ def pre(tool, inp, cwd, reg):
     return None
 
 
-# Commands after an eval that print nothing of their own (tee, tail, head and grep only pass the eval's output on).
-QUIET = {"true", ":", "false", "exit", "tee", "tail", "head", "grep"}
+# Commands after an eval that print nothing of their own.
+QUIET = {"true", ":", "false", "exit"}
+# Filters that only pass the eval's output on: quiet only right after a `|` and with no file to read.
+PIPE_FILTERS = {"tee", "tail", "head", "grep"}
+
+
+def quiet_after(sep, words):
+    w = program(words) or [""]
+    name = os.path.basename(w[0])
+    if name in QUIET:
+        return True
+    if name not in PIPE_FILTERS or sep != "|":
+        return False
+    if name == "tee":
+        return True
+    args = [a for a in w[1:] if not a.startswith("-") and not a.isdigit()]
+    if any(a.startswith("-") and a.lstrip("-")[:1] in ("f",) for a in w[1:] if name == "grep"):
+        return False  # grep -f reads patterns from a file
+    return len(args) <= (1 if name == "grep" else 0)  # grep keeps its pattern; anything more is a file
 
 
 def post(tool, inp, resp, cwd, reg):
@@ -566,7 +583,7 @@ def post(tool, inp, resp, cwd, reg):
                 # The exit status is the eval's only when nothing after it can overwrite it (`; true`, `|| x`, `| tee`).
                 after = segs[i + 1:]
                 # A later command that prints (`echo 47/50`) could fake the score when the status is masked.
-                quiet = all(os.path.basename((program(x) or [""])[0]) in QUIET for _, x in after)
+                quiet = all(quiet_after(sep, x) for sep, x in after)
                 hits[e["name"]] = (all(s == "&&" for s, _ in after), quiet)
     if not hits:
         return
