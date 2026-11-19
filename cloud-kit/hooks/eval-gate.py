@@ -563,9 +563,21 @@ def quiet_after(sep, words):
     if name == "tee":
         return True
     args = [a for a in w[1:] if not a.startswith("-") and not a.isdigit()]
-    if any(a.startswith("-") and a.lstrip("-")[:1] in ("f",) for a in w[1:] if name == "grep"):
-        return False  # grep -f reads patterns from a file
+    if name == "grep" and any(grep_reads_files(a) for a in w[1:]):
+        return False
     return len(args) <= (1 if name == "grep" else 0)  # grep keeps its pattern; anything more is a file
+
+
+GREP_FILE_LONG = ("--recursive", "--dereference-recursive", "--file", "--directories")
+
+
+def grep_reads_files(arg):
+    """grep flags that read files with no file operand: -r/-R search the current
+    directory (GNU grep), -f reads patterns from a file, -d sets how to read dirs.
+    Short flags cluster, so -rf and -ir count too."""
+    if arg.startswith("--"):
+        return arg.startswith(GREP_FILE_LONG)
+    return arg.startswith("-") and any(c in "rRfd" for c in arg[1:])
 
 
 def post(tool, inp, resp, cwd, reg):

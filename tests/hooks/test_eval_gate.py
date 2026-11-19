@@ -301,7 +301,17 @@ class MentionsAndStatus(Fixture):
         for cmd in ("PYTHONPATH=. uv run python -m evals.m3 qualify; grep -h . /tmp/fake.txt",
                     "PYTHONPATH=. uv run python -m evals.m3 qualify; tail -1 /tmp/fake.txt",
                     "PYTHONPATH=. uv run python -m evals.m3 qualify | head -c 100 /tmp/fake.txt",
-                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -f /tmp/pats"):
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -f /tmp/pats",
+                    # GNU grep -r with no file searches the current directory.
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep -r 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep -R 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep --recursive 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep --dereference-recursive 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep -ir 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -rf pats",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --file=pats",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -d recurse 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --directories=recurse 47/50"):
             self.bash(cmd, d, event="PostToolUse", resp={"stdout": "47/50", "stderr": "", "exit_code": 0})
             st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
             self.assertFalse(st["ok"], cmd)
@@ -309,7 +319,8 @@ class MentionsAndStatus(Fixture):
     def test_masked_exit_score_through_tail_and_grep_is_trusted(self):
         d = self.staged()
         for cmd in ("PYTHONPATH=. uv run python -m evals.m3 qualify 2>&1 | tail -5",
-                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -i score"):
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -i score",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -E --fixed-strings score"):
             self.bash(cmd, d, event="PostToolUse", resp={"stdout": "score 47/50", "stderr": "", "exit_code": 0})
             st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
             self.assertTrue(st["ok"], cmd)
