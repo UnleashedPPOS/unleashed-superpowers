@@ -40,6 +40,18 @@ Three places, each with hard limits measured 2026-11-12 (memory `reference-where
 - One consolidated check for all lanes at most every 30+ min.
 - Cloud lanes never wait on self-hosted CI: they make PRs ready and a local merger merges (`~/.claude/bin/pr-auto-merge`). More than 10 PRs queued → one merge-train PR per repo labelled `ci:priority` (memory `merge-train-playbook`).
 
+## Catalogue: briefs (lanes, routines, sub-agents; council audit 2026-11-16)
+A brief states the outcome and the bar, not the steps. The agent picks the steps, because a step list goes stale as soon as the code turns out different from what its writer pictured. Use four parts:
+```text
+Goal: <the outcome, in the founder's words, and why it matters>.
+Constraints: money <spend cap; OpenRouter only in the OS app>; safety <prod data, merge or not, secrets, destructive git>; model policy <model; sub-agent budget: at most N, Sonnet build, Haiku mechanical, Opus review, never Fable>.
+Done when: <the check that proves it: a command and its expected result, an eval score, a PR state, a screenshot>.
+Report: <where the result goes (PR body, status page link), under 300 words>. Context: <repo, files, links, what is ruled out>.
+```
+- Give steps only where the order is itself a constraint (migration before deploy), or for mechanical Haiku jobs, which name the exact files and change.
+- If you can't write a check that proves success, you don't understand the task well enough to hand it off. Work out the check first.
+- Routine prompts use the same shape, and model-guard checks their model and cap. Examples: the migration routine in `llm-provider-chain` and `docs/learning/monthly-prune.md`.
+
 ## Catalogue: routines (RemoteTrigger)
 - `list` returns 300KB+, `list_runs`/`get_run_log` ~10KB each: never poll in a loop; `get` one id or save to a file and summarise.
 - No per-PR "re-check CI" routines; one watcher for all.

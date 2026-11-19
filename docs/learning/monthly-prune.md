@@ -1,41 +1,40 @@
 # Monthly prune: routine prompt
 
-Book this as a monthly cloud routine on Opus (it makes judgement calls about retiring rules), plus a
-local run on the Mac for the parts the cloud can't see (hits log, feedback memories). Paste the block below as
-the routine prompt.
+This runs monthly as a cloud routine on Opus, because it makes judgement calls about retiring rules. A local run on the Mac covers what the cloud can't see: the hits log and the feedback memories.
+
+The booking definition (schedule, model, repo) is `docs/learning/monthly-prune.routine.json`. The prompt is the block below; it has one home, and the routine content points here. `tests/learning/test_monthly_prune.py` checks that the booked definition passes model-guard: Opus, a stated sub-agent cap and a monthly schedule. To book it, pass the definition to RemoteTrigger `create` with this block as the event content.
 
 ```text
-Monthly corrections prune for UnleashedPPOS/unleashed-superpowers. No API keys, no live LLM calls.
-Sub-agent cap: 1.
+Monthly corrections prune for UnleashedPPOS/unleashed-superpowers.
 
-1. Clone the repo. Run:
-     python3 scripts/corrections.py prune > /tmp/prune.md
-     python3 scripts/corrections.py inventory --check
-     python3 scripts/corrections.py unenforced --check
-     python3 -m unittest discover -s tests/hooks && python3 -m unittest discover -s tests/learning
-   On the Mac also pass --hits ~/.claude/state/corrections-hits.jsonl and
-   --memory-dir <your memory dir> (defaults: the hits log above and $CORRECTIONS_MEMORY_DIR or the first
-   ~/.claude/projects/*/memory with feedback-*.md files).
+Goal: the always-loaded rules stay small, current and enforced. Every founder correction has one home.
+Checks that never fire are retired or justified. Prose corrections the founder keeps repeating become
+checks or evals.
 
-2. Never-fired checks (0 hits in 30 days): keep it if the mistake is rare but costly (credentials,
-   OpenRouter, deleting test accounts); otherwise retire it (class -> prose, or delete the entry and its rule
-   line) and say why in the PR.
+Constraints: no API keys and no live LLM calls. Model: Opus. Sub-agent budget: at most 1, Sonnet only,
+never Fable. Never raise docs/learning/budget.json without the founder. Keep a never-fired check when the
+mistake is rare but costly (credentials, OpenRouter, deleting test accounts).
 
-3. Stale dated facts (measurements older than 45 days in always-loaded rules): re-measure if the cloud
-   can, else move the fact into the skill that owns it (where-work-runs, llm-provider-chain) with its date,
-   and leave the rule line undated.
+Input: python3 scripts/corrections.py prune (never-fired checks, stale dated facts, unclassified
+feedback memories). On the Mac also pass --hits ~/.claude/state/corrections-hits.jsonl and
+--memory-dir <memory dir> (default: $CORRECTIONS_MEMORY_DIR or the first ~/.claude/projects/*/memory
+with feedback-*.md files).
 
-4. Word budget: if over docs/learning/budget.json, move detail into skills until under. Never raise the
-   budget without the founder.
+Done when all of these hold:
+- Every check with 0 hits in 30 days is either kept, with the reason in the PR, or retired (class ->
+  prose, or the entry and its rule line deleted).
+- No always-loaded rule carries a measurement older than 45 days. Each one is either re-measured or moved,
+  with its date, into the skill that owns it (where-work-runs, llm-provider-chain), leaving the rule line
+  undated.
+- The always-loaded set is under the word budget, with the extra detail moved into skills.
+- Each fact (model table, provider order, question limit, merge policy) has one home, and any other
+  copy is a pointer.
+- Every prose correction the founder repeated this month is a check or an eval.
+- On the Mac run, every feedback memory is classified with /learnings and cited as its entry's source.
+- These pass: python3 scripts/corrections.py inventory --check, python3 scripts/corrections.py
+  unenforced --check, and python3 -m unittest discover -s tests/hooks && python3 -m unittest discover
+  -s tests/learning.
 
-5. Unclassified feedback memories (Mac run): classify each with /learnings (check, eval or prose) and cite
-   it as the entry's source.
-
-6. Unenforced report: any prose correction the founder repeated this month gets promoted to a check or eval.
-
-7. Contradictions: grep the rules and skills for two homes of one fact (model table, provider order,
-   question limits, merge policy). Each fact keeps one home; the other becomes a pointer.
-
-8. One PR titled "chore(learning): monthly prune YYYY-MM" with the prune report in the body, /ship-check,
-   and a PushNotification only if something needs the founder.
+Report: one PR titled "chore(learning): monthly prune YYYY-MM", with the prune report in the body and
+/ship-check run on it. Send a PushNotification only if something needs the founder.
 ```

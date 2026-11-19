@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "note": "Eval per product repo for cloud-kit/hooks/eval-gate.py. Repo = basename of the git origin URL. 'paths' is a regex searched in each changed path; the first eval that matches covers the file, else 'default' (null = no eval covers it: the PR says 'Eval: none' and why). 'ran' is a regex: a Bash command matching it counts as a run of that eval. 'live' runs only where vault exists; live evals never use OpenRouter (skill llm-provider-chain). Keep in sync with the eval table in skills/llm-provider-chain/SKILL.md (tests/hooks/test_eval_gate.py checks).",
+  "repos": {
+    "unleashed-systems": {
+      "default": "inbox-triage",
+      "evals": [
+        {
+          "name": "owner-context",
+          "paths": "owner-context",
+          "always": "^evals/owner-context/",
+          "offline": "npm run eval:owner-context",
+          "live": null,
+          "ran": "eval:owner-context"
+        },
+        {
+          "name": "inbox-triage",
+          "paths": "^(src/lib/inbox/|src/lib/evals/|evals/inbox-triage/|tests/evals/)",
+          "always": "^(evals/inbox-triage/|src/lib/evals/|tests/evals/)",
+          "offline": "npm run eval:triage",
+          "live": "vault run --keys BEDROCK_API_KEY,GROQ_API_KEY,ANTHROPIC_API_KEY -- npm run eval:triage:live",
+          "ran": "eval:triage|vitest run[^\\n]*(tests/evals|vitest\\.eval)"
+        }
+      ]
+    },
+    "unleashed-leadgen": {
+      "default": null,
+      "evals": [
+        {
+          "name": "qualify",
+          "paths": "qualif",
+          "always": "(prompts/qualify\\.md$|^evals/golden/qualify/|^evals/qualify\\.py$)",
+          "offline": "PYTHONPATH=. uv run python -m evals.m3 qualify",
+          "live": "vault run --keys BEDROCK_API_KEY,GROQ_API_KEY,ANTHROPIC_API_KEY -- env PYTHONPATH=. uv run python -m evals.m3 qualify --live",
+          "ran": "evals\\.m3\\s+qualify"
+        },
+        {
+          "name": "reply-intent",
+          "paths": "(reply|inbox|intent|^evals/(m3|core|mock_models)\\.py$)",
+          "always": "(^evals/golden/reply_intent|^evals/reply_intent\\.py$|^evals/(m3|core|mock_models)\\.py$)",
+          "offline": "PYTHONPATH=. uv run python -m evals.m3 reply-intent",
+          "live": "vault run --keys BEDROCK_API_KEY,GROQ_API_KEY,ANTHROPIC_API_KEY -- env PYTHONPATH=. uv run python -m evals.m3 reply-intent --live",
+          "ran": "evals\\.m3\\s+reply-intent"
+        }
+      ],
+      "note": "The outreach draft prompts (prompts/draft_*.md) have no eval yet: write a small one."
+    },
+    "unleashedos": {
+      "default": null,
+      "evals": [
+        {
+          "name": "owner-memory",
+          "paths": "owner-memory",
+          "always": "owner-memory/evals",
+          "offline": "deno test -A supabase/functions/_shared/owner-memory/evals_test.ts",
+          "live": "vault run --keys BEDROCK_API_KEY -- deno run --allow-env --allow-net --allow-read scripts/owner-memory/live-eval.ts",
+          "ran": "owner-memory/(evals_test\\.ts|live-eval\\.ts)"
+        },
+        {
+          "name": "voice",
+          "paths": "^supabase/functions/(voice/|_shared/voice/)",
+          "always": "^supabase/functions/voice/(evals|prompts)/",
+          "offline": "deno test -A supabase/functions/voice/evals/",
+          "live": null,
+          "ran": "deno test[^\\n]*supabase/functions/voice/evals"
+        }
+      ],
+      "note": "narrate-story, stream-agent, personalization and voice-agent prompts have no eval yet: write a small one."
+    },
+    "unleashed-os-mobile": {
+      "default": null,
+      "evals": [
+        {
+          "name": "memo",
+          "paths": "^(features/voice/memo/|scripts/voice-eval/)",
+          "always": "^scripts/voice-eval/",
+          "offline": "bun run eval:memo:check",
+          "live": null,
+          "ran": "eval:memo:(check|dry)",
+          "note": "Offline only: the live memo eval (eval:memo) calls OpenRouter, which evals may never use."
+        },
+        {
+          "name": "voice-transcription",
+          "paths": "^(eval/voice/|features/voice/)",
+          "always": "^eval/voice/",
+          "offline": "bun run eval:voice:dry",
+          "live": "bun run eval:voice",
+          "ran": "eval:voice",
+          "note": "Live needs ANTHROPIC_API_KEY and the Supabase env from the vault."
+        },
+        {
+          "name": "commands",
+          "paths": "^(eval/(commands|router)/|features/brain/|features/os/)",
+          "always": "^eval/(commands|router)/",
+          "offline": "bun run eval:commands:dry && bunx jest eval/commands eval/router",
+          "live": null,
+          "ran": "eval:commands|jest[^\\n]*eval/(commands|router)",
+          "note": "Offline only: the live commands eval (eval:commands) calls OpenRouter, which evals may never use. Set a live command once EVAL_FUNCTIONS_URL has a path off it."
+        }
+      ]
+    },
+    "unleashed-voice": {
+      "default": "prompts",
+      "evals": [
+        {
+          "name": "prompts",
+          "paths": "^(livekit_agent/|voice_core/|selflearn/|eval/)",
+          "always": "^eval/",
+          "offline": "python -m pytest -o addopts=\"\" --no-cov tests/test_corrections.py tests/test_receptionist_eval.py livekit_agent/tests/test_prompt.py livekit_agent/tests/test_persona_prompt.py livekit_agent/tests/test_discovery_prompt.py livekit_agent/tests/test_crisis_prompts.py voice_core/tests/test_system_prompt.py",
+          "live": null,
+          "ran": "pytest[^\\n]*(test_receptionist_eval|test_prompt|test_system_prompt)",
+          "note": "No live eval: scripts/sales_line_eval.py calls OpenRouter, which evals may never use."
+        }
+      ]
+    }
+  }
+}

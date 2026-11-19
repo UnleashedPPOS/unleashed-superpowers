@@ -158,7 +158,7 @@ A session's worst blind spot is treating "merge it" as trivial when the branch i
 **Run EVERY applicable pass below — running the full review chain is a primary reason this command exists.** Skipping the review fan-out and self-asserting "looks good" is the exact failure that shipped a real bug past a "passed" audit. Reviewers are read-only and run in parallel; cleanup/fix skills mutate the tree and run sequentially, each its own commit.
 
 ### 2.A — Reviewer fan-out (READ-ONLY, run IN PARALLEL — one message, multiple Agent calls)
-These don't touch the tree, so dispatch them concurrently and collect structured findings. Give each a tight, scope-fenced brief (exact file list + the diff), and require findings ranked Blocker / Important / Nit with `file:line` evidence. Run **all that apply**:
+These don't touch the tree, so dispatch them concurrently and collect structured findings. Give each a tight, scope-fenced brief: the goal of the change, the constraints it must hold, the exact file list and the diff. Require findings ranked Blocker / Important / Nit with `file:line` evidence. Run **all that apply**:
 
 1. **Code review (two independent lenses — run both):**
    - `superpowers:code-reviewer` agent (the superpowers reviewer — the user explicitly wants superpowers in the chain), AND

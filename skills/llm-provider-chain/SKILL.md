@@ -55,15 +55,51 @@ Two endpoints work with the same key: `bedrock-runtime.<region>.amazonaws.com/op
 - Voice commands, 322 cases (2026-11-12): gpt-oss-120b 248, low reasoning 240, ministral-3-14b 235 (twice as fast), glm-4.7-flash 210, qwen3-next-80b 210. Tool-critical stays on gpt-oss-120b.
 - Moving a job to a cheaper model: run the repo's eval on both, report both scores, switch only if within 2% (founder can change the margin). No eval means write a small one first.
 
+## Catalogue: eval per repo (enforced by the eval-gate hook)
+A commit or PR that changes an LLM prompt or model choice in these repos runs the matching eval first. The PR body then carries one line per eval: `Eval (<name>, offline|live): <score>`. The cloud runs offline. A machine with `vault` also runs live, and live evals never use OpenRouter. If no eval covers the change, the PR says `Eval: none: <why>`, and a small eval gets written (see above).
+
+What counts as a prompt or model change:
+- a prompt path (`prompts/`, `*_prompt.py`, `system_prompt`) or an eval's own data;
+- an LLM file inside an eval's area, or a file anywhere that builds a system prompt;
+- a changed line with a model id, a model assignment or a prompt string, outside tests and docs.
+
+An eval counts as run only when a runner (`npm`, `bun`, `deno`, `pytest`, `uv`, `vault run` and the like) starts the command; naming it in a commit message or a grep does not.
+
+The hook is `cloud-kit/hooks/eval-gate.py`, and its registry is `cloud-kit/hooks/eval-gate.json`. When you edit a row below, update the matching registry entry too; the test checks that the two agree. Off switch, for the founder only: `EVAL_GATE_OFF=1`.
+
+| Repo | Eval | Covers | Offline (cloud) | Live (vault) |
+|---|---|---|---|---|
+| `unleashed-systems` | owner-context | `owner-context` | `npm run eval:owner-context` | none |
+| `unleashed-systems` | inbox-triage (default) | `src/lib/inbox/`, `src/lib/evals/`, `evals/inbox-triage/` | `npm run eval:triage` | `vault run --keys BEDROCK_API_KEY,GROQ_API_KEY,ANTHROPIC_API_KEY -- npm run eval:triage:live` |
+| `unleashed-leadgen` | qualify | `prompts/qualify.md`, `evals/golden/qualify/` | `PYTHONPATH=. uv run python -m evals.m3 qualify` | same with `--live`, under `vault run` (Netcup) |
+| `unleashed-leadgen` | reply-intent | reply and intent code, `evals/golden/reply_intent*` | `PYTHONPATH=. uv run python -m evals.m3 reply-intent` | same with `--live`, under `vault run` (Netcup) |
+| `unleashedos` | owner-memory | `owner-memory` | `deno test -A supabase/functions/_shared/owner-memory/evals_test.ts` | `vault run --keys BEDROCK_API_KEY -- deno run --allow-env --allow-net --allow-read scripts/owner-memory/live-eval.ts` |
+| `unleashedos` | voice | `supabase/functions/voice/`, `_shared/voice/` | `deno test -A supabase/functions/voice/evals/` | none |
+| `unleashed-os-mobile` | memo | `features/voice/memo/`, `scripts/voice-eval/` | `bun run eval:memo:check` | none (`eval:memo` calls OpenRouter) |
+| `unleashed-os-mobile` | voice-transcription | `eval/voice/`, `features/voice/` | `bun run eval:voice:dry` | `bun run eval:voice` |
+| `unleashed-os-mobile` | commands | `eval/commands/`, `eval/router/`, `features/brain/`, `features/os/` | `bun run eval:commands:dry && bunx jest eval/commands eval/router` | none (`eval:commands` calls OpenRouter) |
+| `unleashed-voice` | prompts (default) | `livekit_agent/`, `voice_core/`, `selflearn/`, `eval/` | `python -m pytest -o addopts="" --no-cov tests/test_corrections.py tests/test_receptionist_eval.py livekit_agent/tests/test_prompt.py livekit_agent/tests/test_persona_prompt.py livekit_agent/tests/test_discovery_prompt.py livekit_agent/tests/test_crisis_prompts.py voice_core/tests/test_system_prompt.py` | none (`sales_line_eval.py` calls OpenRouter) |
+
+These have no eval yet, so their PRs carry `Eval: none` until one is written:
+- leadgen outreach drafts (`prompts/draft_*.md`);
+- unleashedos narrate-story, stream-agent, personalization and voice-agent prompts;
+- mobile prompts outside the areas above.
+
 ## Catalogue: OpenRouter spend checks
 - Per key: `GET https://openrouter.ai/api/v1/key` (`usage_daily`, `limit_remaining`). Account: `GET /api/v1/credits`. Always via `vault run`, never print the key. These two read-only calls are the only OpenRouter calls the correction check allows outside the OS repos.
 
 ## Migration routine (moving a repo off OpenRouter, run as a cloud routine)
-1. Read the existing LLM code, callers, tests and docs; extend them into one shared helper per language.
-2. No API keys in the cloud: no live calls. Mocked-HTTP tests for failover order, the 402 skip and "OpenRouter not called by default". Run the repo's tests, lint and typecheck.
-3. Docs and env examples get names only, never values.
-4. ONE PR to the default branch titled `feat(llm): move off OpenRouter to Bedrock, Groq, Anthropic`. Do not merge (this brief overrides the usual merge-it-yourself rule). PR body: every call site moved, env vars the deploy needs, anything left on OpenRouter and why, test counts.
-5. Final message: PR link plus open items, under 200 words.
+- **Goal:** every LLM call in the repo runs Bedrock → Groq → Anthropic through one shared helper per language, extended from the existing LLM code, callers, tests and docs. OpenRouter is not called by default.
+- **Constraints:**
+  - There are no API keys in the cloud, so make no live calls.
+  - Docs and env examples get names only, never values.
+  - Do not merge. This brief overrides the usual merge-it-yourself rule.
+  - Model policy and sub-agent budget: Sonnet build, at most 2 sub-agents, never Fable.
+- **Done when:**
+  - Mocked-HTTP tests prove the failover order, the 402 skip and that OpenRouter is not called by default.
+  - The repo's tests, lint and typecheck pass.
+  - The repo's offline eval (table above) scores within 2% of its pre-migration score.
+- **Report:** ONE PR to the default branch, titled `feat(llm): move off OpenRouter to Bedrock, Groq, Anthropic`. The body lists every call site moved, the env vars the deploy needs, anything left on OpenRouter and why, the test counts and the `Eval (...)` line. The final message is the PR link plus open items, under 200 words.
 
 ## Anti-pattern flags
 - "Just for a quick test, use the OpenRouter key" → blocked; use Bedrock.
