@@ -441,6 +441,19 @@ class Loopholes(Fixture):
         self.assertEqual((r.returncode, r.stdout), (0, ""))
         self.assertIn("check skipped", r.stderr)
 
+    def test_symlinked_hook_finds_its_registry(self):
+        # ~/.claude/hooks/eval-gate.py is a symlink with no eval-gate.json beside it.
+        d = self.model_change()
+        link = os.path.join(self.tmp.name, "hooks", "eval-gate.py")
+        os.makedirs(os.path.dirname(link))
+        os.symlink(HOOK, link)
+        r = subprocess.run([sys.executable, link], capture_output=True, text=True, timeout=30,
+                           input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -am x"},
+                                             "cwd": d}), env=self.env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("check skipped", r.stderr)
+        self.assertTrue(r.stdout.strip(), "symlinked hook did not gate the commit")
+
 
 class Safety(Fixture):
     def run_raw(self, stdin, env=None):
