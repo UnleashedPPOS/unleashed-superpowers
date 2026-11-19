@@ -10,11 +10,14 @@ runs the live one too.
                         (EVAL_GATE_STATE, default ~/.claude/state/eval-gate.json) with the output tail.
   PreToolUse git commit the files about to be committed (staged; plus unstaged/untracked when the
                         command also runs `git add` or `commit -a`) are scanned. A prompt/model change
-                        with no recorded run of its eval since the files last changed is denied.
+                        with no passing run of its eval since the files last changed gets a warning; the commit is never
+                        blocked (the hard requirement is at PR time). Only a real `git commit` counts, not a
+                        mention in echo/grep/log, and not commit-tree.
   PreToolUse PR create  `gh pr create` or a GitHub MCP create_pull_request: the branch diff against
                         its base is scanned the same way, and the body must carry one score line per
                         eval ("Eval (inbox-triage, offline): 47/50") or "Eval: none" with a reason
-                        when no eval covers the change.
+                        when no eval covers the change, or "Eval: skipped: <why>" when it could not run.
+                        A failed or missing run blocks the PR.
 
 What counts as a prompt or model change:
   - a changed path under a prompt location (prompts/ dirs, *_prompt.py, system_prompt files) or inside
@@ -38,8 +41,8 @@ STATE = os.environ.get("EVAL_GATE_STATE") or os.path.expanduser("~/.claude/state
 
 PR_TOOL = re.compile(r"^mcp__.*github.*__create_pull_request$")
 GIT_OPTS = r"\bgit(?:\s+(?:-[cC]\s+\S+|--[\w-]+(?:=\S+)?|-[a-zA-Z]))*\s+"  # git -c k=v --no-pager -C x
-COMMIT = re.compile(GIT_OPTS + r"commit\b")
-PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b")
+COMMIT = re.compile(GIT_OPTS + r"commit(?![\w-])")  # not commit-tree / commit-graph
+PR_CREATE = re.compile(r"\bgh\s+pr\s+create(?![\w-])")  # only used on a real gh segment, see is_pr_create()
 ADD = re.compile(GIT_OPTS + r"add\b")
 # Programs that run an eval. A command counts as an eval run only when one of these starts a simple command
 # whose words match the eval's `ran` regex (so `git commit -m "ran eval:triage"` or `grep eval:triage` don't).
@@ -49,7 +52,7 @@ WRAPPERS = {"time", "nice", "sudo", "env", "timeout", "nohup"}  # looked through
 # Wrapper flags whose value is the next word (`sudo -u me`, `nice -n 5`, `timeout -s KILL 60`).
 WRAPPER_ARGS = {"sudo": ("-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t"), "nice": ("-n",), "timeout": ("-s", "-k"), "env": ("-u", "-C", "-S")}
 SHELLS = {"bash", "sh", "zsh"}
-COMMIT_ALL = re.compile(r"\bcommit\b[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
+COMMIT_ALL = re.compile(r"\bcommit(?![\w-])[^|;&]*\s(?:--all\b|-[a-zA-Z]*a[a-zA-Z]*\b)")
 
 PROMPT_PATH = re.compile(
     r"(^|/)prompts?/"                                  # prompts/ directories
@@ -79,9 +82,10 @@ PROMPT_WORD = re.compile(r"(?i)system|role|prompt|persona|instruction")
 LONG_YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b[^\n]{60,}")
 SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+(?!\d|\s*/))")  # 47/50 or 94% (not a date 11/18/26)
 NONE_LINE = re.compile(r"(?i)\beval\s*:\s*none\b[^\n]{8,}")
+SKIPPED_LINE = re.compile(r"(?i)\beval\s*:\s*skipped\s*:\s*[^\n]{8,}")
 
 
-def sh(args, cwd, timeout=8):
+def sh(args, cwd, timeout=3):
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip()[:200])
@@ -181,6 +185,44 @@ def program(words):
     return w
 
 
+GIT_VALUE_OPTS = ("-c", "-C", "--git-dir", "--work-tree", "--namespace", "--exec-path")
+
+
+def git_sub(words):
+    """The git subcommand of a simple command whose real program is git (`git -c k=v -C x commit` -> "commit"),
+    else None. Exact word, so `commit-tree` is not `commit` and `echo git commit` is not git at all."""
+    w = program(words)
+    if not w or os.path.basename(w[0]) != "git":
+        return None
+    i = 1
+    while i < len(w) and w[i].startswith("-"):
+        i += 2 if w[i] in GIT_VALUE_OPTS else 1
+    return w[i] if i < len(w) else None
+
+
+def gh_pr_create(words):
+    """True when the simple command's real program is `gh pr create` (flags like -R x allowed before)."""
+    w = program(words)
+    if not w or os.path.basename(w[0]) != "gh":
+        return False
+    rest, i = [], 1
+    while i < len(w) and len(rest) < 2:
+        if w[i].startswith("-"):
+            i += 2 if w[i] in ("-R", "--repo", "--hostname") else 1
+        else:
+            rest.append(w[i])
+            i += 1
+    return rest == ["pr", "create"]
+
+
+def is_commit(cmd):
+    return any(git_sub(w) == "commit" for _, w in flat_segments(cmd))
+
+
+def is_pr_create(cmd):
+    return any(gh_pr_create(w) for _, w in flat_segments(cmd))
+
+
 def runs(words, e, depth=0):
     """True when one simple command actually runs eval `e`: an eval runner (npm, bun, deno, pytest ...) is the
     program, not a mention in a commit message, a grep or an echo. `bash -c '...'` is looked inside."""
@@ -211,7 +253,7 @@ def ran_before_commit(cmd, e):
     for sep, words in flat_segments(cmd):
         if sep not in (None, "&&"):
             chain = []
-        if COMMIT.search(" ".join(words)):
+        if git_sub(words) == "commit":
             return any(runs(w, e) for w in chain)
         chain.append(words)
     return False
@@ -331,8 +373,9 @@ def missing_runs(repo, cfg, top, groups, cmd=""):
         e = next(x for x in cfg["evals"] if x["name"] == name)
         if cmd and ran_before_commit(cmd, e):
             continue
-        ran = state.get(name, {}).get("ts", 0)
-        if ran < newest_mtime(top, [p for p, _ in items]):
+        rec = state.get(name, {})
+        ran = rec.get("ts", 0)
+        if rec.get("ok") is False or ran < newest_mtime(top, [p for p, _ in items]):  # failed counts as not run
             need.append(name)
     return need
 
@@ -392,14 +435,15 @@ def check_commit(repo, cfg, top, cmd, d=None):
         return None
     lines = [f"- {n}: {how(cfg, n)}. Changed: {files_list(groups[n])}" for n in need]
     where = "Here (local, vault present) run offline and live." if local() else "Cloud: run the offline eval."
-    return (f"eval-gate: this commit changes an LLM prompt or model in {repo} and its eval has not run since. "
-            f"{where}\n" + "\n".join(lines) +
-            "\nThen commit again and put the score in the PR body, e.g. `Eval (" + need[0] + ", offline): 47/50`.")
+    return (f"eval-gate WARNING (commit goes through): this commit changes an LLM prompt or model in {repo} and its "
+            f"eval has not run (or failed) since. {where}\n" + "\n".join(lines) +
+            "\nThe PR is blocked until it passes and the score is in the PR body, e.g. `Eval (" + need[0] +
+            ", offline): 47/50`, or the body says `Eval: skipped: <why>`.")
 
 
 def check_pr(repo, cfg, top, base, head, body):
     groups = classify(cfg, branch_changes(top, base, head), top)
-    if not groups:
+    if not groups or SKIPPED_LINE.search(body):
         return None
     problems = []
     need = missing_runs(repo, cfg, top, groups)
@@ -466,24 +510,28 @@ def find_clone(repo, cwd):
     return None
 
 
+def deny(msg):
+    return ("deny", msg) if msg else None
+
+
 def pre(tool, inp, cwd, reg):
     if tool == "Bash":
         cmd = inp.get("command") or ""
-        is_commit, is_pr = bool(COMMIT.search(cmd)), bool(PR_CREATE.search(cmd))
-        if not (is_commit or is_pr):
+        commit, pr = is_commit(cmd), is_pr_create(cmd)
+        if not (commit or pr):
             return None
         d = target_dir(cmd, cwd)
         repo, top = repo_of(d)
         if repo not in reg:
             return None
-        if is_commit:
+        if commit:
             r = check_commit(repo, reg[repo], top, cmd, d)
             if r:
-                return r
-        if is_pr:
+                return ("warn", r)  # a commit is never blocked; the hard requirement is at PR time
+        if pr:
             base = flag(cmd, ("--base", "-B")) or default_base(top)
             head = flag(cmd, ("--head", "-H"))
-            return check_pr(repo, reg[repo], top, base, f"origin/{head}" if head else "HEAD", pr_body_from_cmd(cmd, d))
+            return deny(check_pr(repo, reg[repo], top, base, f"origin/{head}" if head else "HEAD", pr_body_from_cmd(cmd, d)))
         return None
     if PR_TOOL.match(tool):
         repo = inp.get("repo") or ""
@@ -495,7 +543,7 @@ def pre(tool, inp, cwd, reg):
         head = inp.get("head") or "HEAD"
         cur = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"], top).strip()
         head_ref = "HEAD" if head in (cur, "HEAD") else f"origin/{head}"
-        return check_pr(repo, reg[repo], top, inp.get("base") or default_base(top), head_ref, inp.get("body") or "")
+        return deny(check_pr(repo, reg[repo], top, inp.get("base") or default_base(top), head_ref, inp.get("body") or ""))
     return None
 
 
@@ -506,17 +554,38 @@ def post(tool, inp, resp, cwd, reg):
     repo, top = repo_of(target_dir(cmd, cwd))
     if repo not in reg:
         return
-    hits = [e["name"] for e in reg[repo]["evals"] if any(runs(w, e) for _, w in segments(cmd))]
+    segs = flat_segments(cmd)
+    hits = {}
+    for i, (_, w) in enumerate(segs):
+        for e in reg[repo]["evals"]:
+            if runs(w, e):
+                # The exit status is the eval's only when nothing after it can overwrite it (`; true`, `|| x`, `| tee`).
+                after = [s for s, _ in segs[i + 1:]]
+                hits[e["name"]] = all(s == "&&" for s in after)
     if not hits:
         return
-    out = ""
+    out, code = "", None
     if isinstance(resp, dict):
         out = (resp.get("stdout") or "") + (resp.get("stderr") or "")
+        for k in ("exit_code", "exitCode", "returncode", "return_code", "status_code"):
+            if isinstance(resp.get(k), int) and not isinstance(resp.get(k), bool):
+                code = resp[k]
+                break
+        if resp.get("interrupted"):
+            code = code if code else 130
     elif isinstance(resp, str):
         out = resp
+    tail = out[-600:]
+    m = SCORE.search(tail)
+    score = m.group(0) if m else None
     state = load_state()
-    for n in hits:
-        state.setdefault(repo, {})[n] = {"ts": time.time(), "cmd": cmd[:300], "tail": out[-600:]}
+    for n, observable in hits.items():
+        if observable and code is not None:
+            ok = code == 0
+        else:  # status masked or not reported: believe it only if a score came out
+            ok = score is not None
+        state.setdefault(repo, {})[n] = {"ts": time.time(), "cmd": cmd[:300], "tail": tail,
+                                         "exit": code if observable else None, "score": score, "ok": ok}
     save_state(state)
 
 
@@ -540,11 +609,16 @@ def main():
         print(f"eval-gate: check skipped ({type(e).__name__}: {str(e)[:120]}); run the eval by hand",
               file=sys.stderr)
         return 0
-    if reason:
+    if reason and reason[0] == "deny":
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
+            "permissionDecisionReason": reason[1],
+        }}))
+    elif reason:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": reason[1],
         }}))
     return 0
 

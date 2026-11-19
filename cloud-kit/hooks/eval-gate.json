@@ -93,8 +93,9 @@
           "paths": "^(eval/(commands|router)/|features/brain/|features/os/)",
           "always": "^eval/(commands|router)/",
           "offline": "bun run eval:commands:dry && bunx jest eval/commands eval/router",
-          "live": "bun run eval:commands",
-          "ran": "eval:commands|jest[^\\n]*eval/(commands|router)"
+          "live": null,
+          "ran": "eval:commands|jest[^\\n]*eval/(commands|router)",
+          "note": "Offline only: the live commands eval (eval:commands) calls OpenRouter, which evals may never use. Set a live command once EVAL_FUNCTIONS_URL has a path off it."
         }
       ]
     },

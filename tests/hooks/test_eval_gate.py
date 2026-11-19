@@ -59,7 +59,10 @@ class Fixture(unittest.TestCase):
         if not r.stdout.strip():
             return None
         out = json.loads(r.stdout)["hookSpecificOutput"]
-        self.assertEqual(out["permissionDecision"], "deny")
+        self.kind = out.get("permissionDecision", "warn")  # a commit only warns; a PR is denied
+        if self.kind == "warn":
+            return out["additionalContext"]
+        self.assertEqual(self.kind, "deny")
         return out["permissionDecisionReason"]
 
     def bash(self, cmd, cwd, **kw):
@@ -235,6 +238,69 @@ class PullRequest(Fixture):
         self.assertIn("score line for qualify", r, "a date next to the name is not a score")
         for body in ("Eval (qualify): ran on 11/18", "Eval (qualify, offline): 11/18/26"):
             self.assertIsNotNone(self.bash(f"gh pr create --title t --body '{body}'", d), body)
+
+
+class MentionsAndStatus(Fixture):
+    def staged(self):
+        d = self.leadgen()
+        write(d, QUALIFY, "Qualify this lead.\nScore 0-100.\n")
+        git(d, "add", QUALIFY)
+        return d
+
+    def test_mentions_of_git_commit_are_not_commits(self):
+        d = self.staged()
+        for cmd in ('echo "remember to git commit later"', 'git log --grep "git commit"',
+                    "git commit-tree HEAD^{tree} -m x", "grep -r 'gh pr create' docs",
+                    'echo "gh pr create later"'):
+            self.assertIsNone(self.bash(cmd, d), cmd)
+        self.assertIsNotNone(self.bash("git commit -m x", d))
+        self.assertIsNotNone(self.bash("echo hi; git commit -m x", d))
+
+    def test_commit_only_warns_pr_denies(self):
+        d = self.staged()
+        self.assertIsNotNone(self.bash("git commit -m x", d))
+        self.assertEqual(self.kind, "warn")
+        git(d, "commit", "-qm", "x")
+        git(d, "checkout", "-qb", "feat/y", "HEAD")
+        self.assertIsNotNone(self.bash("gh pr create --title t --body 'x'", d))
+        self.assertEqual(self.kind, "deny")
+
+    def test_failed_eval_is_recorded_and_does_not_count(self):
+        d = self.staged()
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify", d, event="PostToolUse",
+                  resp={"stdout": "boom", "stderr": "", "exit_code": 1})
+        st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+        self.assertEqual((st["exit"], st["ok"], st["score"]), (1, False, None))
+        self.assertIsNotNone(self.bash("git commit -m x", d))
+        self.assertEqual(self.kind, "warn")
+
+    def test_masked_exit_is_not_trusted_without_a_score(self):
+        d = self.staged()
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify; true", d, event="PostToolUse",
+                  resp={"stdout": "boom", "stderr": "", "exit_code": 0})
+        st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+        self.assertFalse(st["ok"])
+        self.assertIsNone(st["exit"])
+
+    def test_passing_run_records_score(self):
+        d = self.staged()
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify", d, event="PostToolUse",
+                  resp={"stdout": "qualify: 47/50 PASS", "stderr": "", "exit_code": 0})
+        st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+        self.assertEqual((st["exit"], st["ok"], st["score"]), (0, True, "47/50"))
+        self.assertIsNone(self.bash("git commit -m x", d))
+
+    def test_pr_blocked_by_failed_eval_but_skipped_line_passes(self):
+        d = self.leadgen()
+        git(d, "checkout", "-qb", "feat/x")
+        write(d, QUALIFY, "Score 0-100.\n")
+        git(d, "commit", "-qam", "feat: x")
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify", d, event="PostToolUse",
+                  resp={"stdout": "x", "stderr": "", "exit_code": 2})
+        self.assertIsNotNone(self.bash("gh pr create --title t --body 'Eval (qualify, offline): 47/50'", d))
+        self.assertEqual(self.kind, "deny")
+        self.assertIsNone(self.bash(
+            "gh pr create --title t --body 'Eval: skipped: eval harness down, ran by hand'", d))
 
 
 class Loopholes(Fixture):

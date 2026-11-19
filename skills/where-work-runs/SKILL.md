@@ -44,7 +44,7 @@ Three places, each with hard limits measured 2026-11-12 (memory `reference-where
 A brief states the outcome and the bar, not the steps. The agent picks the steps, because a step list goes stale as soon as the code turns out different from what its writer pictured. Use four parts:
 ```text
 Goal: <the outcome, in the founder's words, and why it matters>.
-Constraints: money <spend cap; OpenRouter only in the OS app>; safety <prod data, merge or not, secrets, destructive git>; model policy <model; sub-agent budget: at most N, Sonnet/Haiku only, never Fable>.
+Constraints: money <spend cap; OpenRouter only in the OS app>; safety <prod data, merge or not, secrets, destructive git>; model policy <model; sub-agent budget: at most N, Sonnet build, Haiku mechanical, Opus review, never Fable>.
 Done when: <the check that proves it: a command and its expected result, an eval score, a PR state, a screenshot>.
 Report: <where the result goes (PR body, status page link), under 300 words>. Context: <repo, files, links, what is ruled out>.
 ```

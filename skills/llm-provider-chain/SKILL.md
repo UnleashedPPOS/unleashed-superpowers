@@ -77,7 +77,7 @@ The hook is `cloud-kit/hooks/eval-gate.py`, and its registry is `cloud-kit/hooks
 | `unleashedos` | voice | `supabase/functions/voice/`, `_shared/voice/` | `deno test -A supabase/functions/voice/evals/` | none |
 | `unleashed-os-mobile` | memo | `features/voice/memo/`, `scripts/voice-eval/` | `bun run eval:memo:check` | none (`eval:memo` calls OpenRouter) |
 | `unleashed-os-mobile` | voice-transcription | `eval/voice/`, `features/voice/` | `bun run eval:voice:dry` | `bun run eval:voice` |
-| `unleashed-os-mobile` | commands | `eval/commands/`, `eval/router/`, `features/brain/`, `features/os/` | `bun run eval:commands:dry && bunx jest eval/commands eval/router` | `bun run eval:commands` (wraps `vault run`) |
+| `unleashed-os-mobile` | commands | `eval/commands/`, `eval/router/`, `features/brain/`, `features/os/` | `bun run eval:commands:dry && bunx jest eval/commands eval/router` | none (`eval:commands` calls OpenRouter) |
 | `unleashed-voice` | prompts (default) | `livekit_agent/`, `voice_core/`, `selflearn/`, `eval/` | `python -m pytest -o addopts="" --no-cov tests/test_corrections.py tests/test_receptionist_eval.py livekit_agent/tests/test_prompt.py livekit_agent/tests/test_persona_prompt.py livekit_agent/tests/test_discovery_prompt.py livekit_agent/tests/test_crisis_prompts.py voice_core/tests/test_system_prompt.py` | none (`sales_line_eval.py` calls OpenRouter) |
 
 These have no eval yet, so their PRs carry `Eval: none` until one is written:
