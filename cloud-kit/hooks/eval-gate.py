@@ -576,7 +576,10 @@ def grep_reads_files(arg):
     directory (GNU grep), -f reads patterns from a file, -d sets how to read dirs.
     Short flags cluster, so -rf and -ir count too."""
     if arg.startswith("--"):
-        return arg.startswith(GREP_FILE_LONG)
+        # GNU grep takes any unambiguous prefix ("--rec", "--dir=recurse"), so a
+        # name that starts one of these flags counts too.
+        name = arg[2:].split("=", 1)[0]
+        return bool(name) and any(f[2:].startswith(name) for f in GREP_FILE_LONG)
     return arg.startswith("-") and any(c in "rRfd" for c in arg[1:])
 
 

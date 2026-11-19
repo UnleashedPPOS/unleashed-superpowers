@@ -311,7 +311,12 @@ class MentionsAndStatus(Fixture):
                     "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -rf pats",
                     "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --file=pats",
                     "PYTHONPATH=. uv run python -m evals.m3 qualify | grep -d recurse 47/50",
-                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --directories=recurse 47/50"):
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --directories=recurse 47/50",
+                    # Unambiguous long-flag prefixes are accepted by GNU grep.
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep --rec 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --dir=recurse 47/50",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify | grep --fil=pats",
+                    "PYTHONPATH=. uv run python -m evals.m3 qualify; true | grep --dereference 47/50"):
             self.bash(cmd, d, event="PostToolUse", resp={"stdout": "47/50", "stderr": "", "exit_code": 0})
             st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
             self.assertFalse(st["ok"], cmd)
