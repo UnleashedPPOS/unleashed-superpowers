@@ -547,6 +547,10 @@ def pre(tool, inp, cwd, reg):
     return None
 
 
+# Commands after an eval that print nothing of their own (tee, tail, head and grep only pass the eval's output on).
+QUIET = {"true", ":", "false", "exit", "tee", "tail", "head", "grep"}
+
+
 def post(tool, inp, resp, cwd, reg):
     if tool != "Bash":
         return
@@ -560,8 +564,10 @@ def post(tool, inp, resp, cwd, reg):
         for e in reg[repo]["evals"]:
             if runs(w, e):
                 # The exit status is the eval's only when nothing after it can overwrite it (`; true`, `|| x`, `| tee`).
-                after = [s for s, _ in segs[i + 1:]]
-                hits[e["name"]] = all(s == "&&" for s in after)
+                after = segs[i + 1:]
+                # A later command that prints (`echo 47/50`) could fake the score when the status is masked.
+                quiet = all(os.path.basename((program(x) or [""])[0]) in QUIET for _, x in after)
+                hits[e["name"]] = (all(s == "&&" for s, _ in after), quiet)
     if not hits:
         return
     out, code = "", None
@@ -579,11 +585,11 @@ def post(tool, inp, resp, cwd, reg):
     m = SCORE.search(tail)
     score = m.group(0) if m else None
     state = load_state()
-    for n, observable in hits.items():
+    for n, (observable, quiet) in hits.items():
         if observable and code is not None:
             ok = code == 0
-        else:  # status masked or not reported: believe it only if a score came out
-            ok = score is not None
+        else:  # status masked or not reported: believe a score only if nothing after the eval printed
+            ok = score is not None and quiet
         state.setdefault(repo, {})[n] = {"ts": time.time(), "cmd": cmd[:300], "tail": tail,
                                          "exit": code if observable else None, "score": score, "ok": ok}
     save_state(state)

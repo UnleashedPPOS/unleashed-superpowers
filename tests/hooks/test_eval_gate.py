@@ -282,6 +282,20 @@ class MentionsAndStatus(Fixture):
         self.assertFalse(st["ok"])
         self.assertIsNone(st["exit"])
 
+    def test_masked_exit_score_from_a_later_echo_is_not_trusted(self):
+        d = self.staged()
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify; echo 47/50", d, event="PostToolUse",
+                  resp={"stdout": "missing script\n47/50", "stderr": "", "exit_code": 0})
+        st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+        self.assertFalse(st["ok"])
+
+    def test_masked_exit_score_through_tee_is_trusted(self):
+        d = self.staged()
+        self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify | tee out.txt", d, event="PostToolUse",
+                  resp={"stdout": "qualify: 47/50 PASS", "stderr": "", "exit_code": 0})
+        st = json.load(open(self.state))["unleashed-leadgen"]["qualify"]
+        self.assertTrue(st["ok"])
+
     def test_passing_run_records_score(self):
         d = self.staged()
         self.bash("PYTHONPATH=. uv run python -m evals.m3 qualify", d, event="PostToolUse",
