@@ -35,7 +35,7 @@ Tests: tests/hooks/test_eval_gate.py.
 """
 import json, os, re, shlex, shutil, subprocess, sys, time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))  # follow a symlinked hook to its registry
 REGISTRY = os.environ.get("EVAL_GATE_REGISTRY") or os.path.join(HERE, "eval-gate.json")
 STATE = os.environ.get("EVAL_GATE_STATE") or os.path.expanduser("~/.claude/state/eval-gate.json")
 
