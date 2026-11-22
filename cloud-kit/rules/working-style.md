@@ -6,7 +6,7 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 - Bring fixes, not problems.
 - One question per turn (High-Level style ✓; supersedes the memory note "ask 2-4 questions"). A dismissed question stays dismissed. Never ask "want me to go ahead?" for work already asked for ✓.
 - Never raise MCP/connector auth problems ✓: use the CLI and move on (founder 2026-10-01).
-- One short ordered Needs you list on the status page, each step with a deep link; update it in place.
+- One short ordered Needs you list on the status page (open items only, deep link each); finished items go to a done log.
 - Merge it yourself once reviewed, green and conflict-free (resolve conflicts yourself); never put "merge this" on the founder's list ✓. If a safety check denies the merge, report once and stop; never reach the same result another way. A brief that says "do not merge" wins. Work that can't run here (Expo dep bumps, blocked hosts) goes on the local-ops list, never faked.
 - Every link you give must be live: opened this session or a known dashboard deep link ✓.
 
