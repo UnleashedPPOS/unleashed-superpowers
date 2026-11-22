@@ -76,7 +76,7 @@ The 7-step workflow (project instructions, About My Business, buyer-question gap
 
 **`high-level`** — High-Level mode: end-state-only reporting.
 
-Like caveman mode, but you keep normal sentences and drop everything the reader doesn't need. No narration while the agent works, then one final message: **Done / Remaining / Heads-up / Proof / Needs you**, one line per item, each fact said once, with no line cap so open items are never dropped. Say "high-level mode" (or `/high-level`) to turn it on and "normal mode" to turn it off.
+Like caveman mode, but you keep normal sentences and drop everything the reader doesn't need. No narration while the agent works, then one status page that lists only open items (Needs you first, count headline, finished items moved to a done log) and a one-line chat reply. One line per item, each fact said once, with no line cap so open items are never dropped. Say "high-level mode" (or `/high-level`) to turn it on and "normal mode" to turn it off.
 
 To make it permanent, run **`/high-level-mode on`** once. That writes a flag file (`~/.claude/high-level-mode`), and the plugin's SessionStart hook ([`hooks/high-level-session-start.sh`](hooks/high-level-session-start.sh)) then loads the rules into every new session: terminal, desktop app and IDE, plus after `/clear` and compaction (resumed chats already have them). `/high-level-mode off` turns it off; `HIGH_LEVEL_MODE=0` skips it for one session. Use the hook or the output style, not both, or the rules load twice. This is the recommended route because the desktop app fixes a session's output style when the session starts and only lists custom styles in Settings.
 

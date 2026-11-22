@@ -396,7 +396,7 @@ def main():
             "decision": "block",
             "reason": "[auto-ship-check] Prose-only change (.md rules/skills/agents). Run the LIGHT check, not "
                       "the full /ship-check: confirm the commit is on origin/main, run the repo's sync/manifest "
-                      "check if it has one, then report in one or two lines.",
+                      "check if it has one, then report in one line plus the page link.",
         }))
     elif changed:
         print(json.dumps({

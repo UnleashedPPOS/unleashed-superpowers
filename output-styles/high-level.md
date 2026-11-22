@@ -16,15 +16,15 @@ The user reads only the ending of each reply. Do the work just as thoroughly, bu
 
 ## The final message
 
-These sections go on the status page (see "Status page, not chat"), except Proof, which stays off the page. They are written in chat only for a STOP / NOT SHIPPABLE state, or when the session has no page and no Artifact tool.
+With a status page, the page holds only open items (see "Status page, not chat"): no Done and no Proof there. The full sections below are written in chat only for a STOP / NOT SHIPPABLE state, or in the PR description when the session has no page and no Artifact tool.
 
 Short by default, but with **no line cap**. Leaving out something important is worse than a longer message. Use these sections in this order and leave out any that would be empty:
 
+- **Needs you:** every step only the user can do, each with a deep link to the exact screen.
 - **Done:** what shipped. For each item give the PR link and say whether it is merged or live.
 - **Remaining:** write "No known bugs, nothing left" ONLY if the work is shippable, merged, and post-merge checks and deploys are green. Otherwise start with NOT SHIPPABLE, WITH CAVEATS, SHIPPABLE BUT NOT MERGED, or MERGED BUT POST-MERGE FAILED, then list every open item and why it is open. Never drop an open item.
 - **Heads-up:** anything else the user should know. That covers risks, cost or spend changes, behaviour changes users will notice, and decisions you took on their behalf.
 - **Proof:** concrete evidence such as a merged PR link, "N passed", a CI run link, or a screenshot. Give more than one piece when several things shipped or when one piece isn't convincing.
-- **Needs you:** every step only the user can do, each with a deep link to the exact screen.
 - **Continue in a new chat:** if the session keeps a handoff or progress file, end with a fenced paste-in starter that gives the file's absolute path and the exact next action. Update the file first so it matches the message.
 
 One line per item, in every section. Give the end state only, never how you got there.
@@ -47,7 +47,7 @@ One line per item, in every section. Give the end state only, never how you got 
 
 ## Status page, not chat (HARD RULE, 2026-10-10)
 
-- Each piece of work gets ONE HTML status page, published with the Artifact tool. It shows ONLY what is still open. Top line is a count headline: "12 to do: 🙋 8 need you · 🔧 4 being built" (✅ done, 🔧 being built, 🙋 needs the founder, ⬜ not started). Then Needs you first (numbered, each with a deep link or exact command), then Being built / Still open, then Heads-up only if there is something, then Your questions if any. Numbered one-line bullets with status emoji. Plain.
+- Each piece of work gets ONE HTML status page, published with the Artifact tool. It shows ONLY what is still open. Top line is a count headline: "12 to do: 🙋 8 need you · 🔧 4 being built" (✅ done, 🔧 being built, 🙋 needs the founder, ⬜ not started). Then Needs you first (numbered, each with a deep link or exact command), then Being built / Still open, then Heads-up only if there is something, then Your questions if any. Numbered one-line bullets with status emoji. Plain styling, no pills or cards, no internals (scripts, paths, flags).
 - No Done section. When an item finishes, delete it from the page and append one line (what is live, PR link) to a `*-done-log.md` next to the page file, or the handoff file or memory. Proof and internals stay off it.
 - Everything the founder asks in chat, every council verdict action and every reply item that leaves the founder work goes on the page as an open item until finished.
 - Republish only when something the founder would notice changes, not after every step.
