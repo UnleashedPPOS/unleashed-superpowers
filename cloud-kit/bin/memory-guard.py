@@ -331,25 +331,37 @@ def brake(dry_run: bool, critical: bool = True) -> int:
     jobs: dict = {}
     for pid in heavy:
         jobs.setdefault(root(pid), []).append(pid)
-    if not critical and len(jobs) < 2:
-        return 0
     records = heavy_lib.gate_records() if heavy_lib else []
-    ranked = sorted(jobs.items(), key=lambda kv: -sum(table[p][1] for p in kv[1]))
-    if len(ranked) >= 2:
-        oldest = max(jobs, key=lambda r: table[r][3])
+
+    def find_rec(root_pid: int):
+        # Map the job back to a heavy-run slot (record.child is the job or an ancestor of it).
+        cur = root_pid
+        while cur in table:
+            rec = next((r for r in records if r.get("child") == cur), None)
+            if rec:
+                return rec
+            cur = table[cur][0]
+            if cur <= 1:
+                break
+        return None
+
+    recs = {r: find_rec(r) for r in jobs}
+    # Only jobs started by heavy-run count as "jobs" for the lone-job rule and the oldest-spared rule;
+    # long-running servers (tsserver, next-server, metro) stay killable at critical pressure only.
+    gated = [r for r in jobs if recs[r]]
+    if not critical and len(gated) < 2:
+        return 0
+    pool = jobs if critical else {r: jobs[r] for r in gated}
+    ranked = sorted(pool.items(), key=lambda kv: -sum(table[p][1] for p in kv[1]))
+    if len(gated) >= 2:
+        oldest = max(gated, key=lambda r: table[r][3])
         ranked = [kv for kv in ranked if kv[0] != oldest]
     freed, killed = 0.0, 0
     for root_pid, members in ranked:
         if freed >= BRAKE_FREE_MB or killed >= BRAKE_MAX_KILLS_PER_CYCLE:
             break
         size = sum(table[p][1] for p in members)
-        # Map the job back to a heavy-run slot (record.child is the job or an ancestor of it).
-        rec, cur = None, root_pid
-        while cur in table and rec is None:
-            rec = next((r for r in records if r.get("child") == cur), None)
-            cur = table[cur][0]
-            if cur <= 1:
-                break
+        rec = recs[root_pid]
         command = (rec or {}).get("cmd") or table[root_pid][2]
         cwd = (rec or {}).get("cwd") or pid_cwd(root_pid)
         if dry_run:

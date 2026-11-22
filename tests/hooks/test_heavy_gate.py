@@ -88,8 +88,13 @@ class RewriteTest(Base):
         self.assertTrue(new.endswith(f"{HEAVY_RUN} --budget=100 npx tsc"), new)
 
     def test_watch_modes_and_npm_ci_are_not_wrapped(self):
-        for cmd in ("npm ci", "npx jest --watch", "npx jest --watchAll", "tsc -w", "tsc --watch", "npx jest -w"):
+        for cmd in ("npm ci", "npx jest --watch", "npx jest --watchAll", "tsc -w", "tsc --watch", "npx tsc -w"):
             self.assertEqual(self.rw(cmd), (None, None), cmd)
+
+    def test_jest_w_workers_and_watchall_false_are_still_gated(self):
+        for cmd in ("npx jest -w 2", "npx jest --watchAll=false", "npx jest --watch=false"):
+            new, _ = self.rw(cmd)
+            self.assertIn(HEAVY_RUN, new or "", cmd)
 
     def test_brace_group_is_wrapped(self):
         new, _ = self.rw("{ npx jest; }")
@@ -399,8 +404,13 @@ class BrakeTest(Base):
     def table(self, rows):
         return {pid: (ppid, rss, cmd, age) for pid, ppid, rss, cmd, age in rows}
 
-    def run_brake(self, rows, dry=False, free=900, critical=True, max_kills=1):
+    def run_brake(self, rows, dry=False, free=900, critical=True, max_kills=1, gated=(100, 200, 300), recs=None):
         killed = []
+        default = [{"pid": 9000 + p, "child": p, "cwd": self.wt, "cmd": next(r[3] for r in rows if r[0] == p), "slot": 0}
+                for p in gated if any(r[0] == p for r in rows)]
+        gr = mock.patch.object(hl, "gate_records", return_value=default if recs is None else recs)
+        gr.start()
+        self.addCleanup(gr.stop)
         self.mg.BRAKE_FREE_MB = free
         self.mg.BRAKE_MAX_KILLS_PER_CYCLE = max_kills
         with mock.patch.object(self.mg, "ps_table", return_value=self.table(rows)), \
@@ -466,11 +476,27 @@ class BrakeTest(Base):
         self.assertEqual((killed, hl.open_entries()), ([], []))
         self.assertIn("would kill job", open(self.env["MEMORY_GUARD_LOG"]).read())
 
+    TSSERVER = (600, 1, 300, "node /x/node_modules/typescript/lib/tsserver.js", 99999)
+
+    def test_editor_server_does_not_make_a_lone_heavy_run_job_killable_on_swap(self):
+        # one heavy-run test + the editor's tsserver (older): still ONE job, so swap alone kills nothing
+        n, killed = self.run_brake([self.ROWS[0], self.TSSERVER], critical=False, gated=(100,))
+        self.assertEqual((n, killed), (0, []))
+
+    def test_oldest_spared_is_among_heavy_run_jobs_only(self):
+        # tsserver is the oldest process but not a heavy-run job: it must not be the one spared
+        n, killed = self.run_brake([self.ROWS[3], self.ROWS[4], self.TSSERVER], critical=False, free=99999,
+                                   gated=(200, 300))
+        self.assertEqual(killed, [300])  # eslint (not the oldest heavy-run job) dies; tsserver untouched on swap
+
+    def test_long_running_server_stays_killable_at_critical(self):
+        n, killed = self.run_brake([self.TSSERVER], critical=True, gated=())
+        self.assertEqual((n, killed), (1, [600]))
+
     def test_heavy_run_job_keeps_its_command_in_the_ledger(self):
         rec = [{"pid": 4242, "child": 90, "cwd": self.wt, "cmd": "npm test", "slot": 0}]
         rows = [(90, 1, 10, "npm test", 5), (100, 90, 300, "node /x/node_modules/.bin/jest", 5)]
-        with mock.patch.object(hl, "gate_records", return_value=rec):
-            self.run_brake(rows)
+        self.run_brake(rows, recs=rec)
         e = hl.open_entries()[0]
         self.assertEqual((e["command"], e["heavy_run_pid"]), ("npm test", 4242))
 

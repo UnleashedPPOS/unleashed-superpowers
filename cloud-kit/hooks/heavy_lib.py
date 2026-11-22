@@ -486,7 +486,8 @@ HEAVY_RES = [
     re.compile(r"^deno\s+check\b"),
     re.compile(r"^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|tests|lint|typecheck|type-check|tsc|build|check|build:check|test:\S+|lint:\S+)(?=\s|$)"),
 ]
-NOT_HEAVY = re.compile(r"(?:^|\s)(?:--help|-h|--version|-v|-V|-w|--watch\S*|--watchAll\S*)(?=\s|$)")
+NOT_HEAVY = re.compile(r"(?:^|\s)(?:--help|-h|--version|-v|-V|--watch(?:All)?(?:=(?!false(?:\s|$))\S*)?)(?=\s|$)")
+TSC_WATCH = re.compile(r"(?:^|\s)-w(?=\s|$)")  # `tsc -w` is watch mode; `jest -w 2` is --maxWorkers
 _LEAD = re.compile(
     r"\s*(?:(?:then|do|else|elif|if|while|until|!|\{|time|exec|command|nohup|env|nice(?:\s+-n\s*-?\d+)?)(?=\s)"
     r"|[A-Za-z_]\w*=(?:\"[^\"]*\"|'[^']*'|[^\s;&|]*)(?=\s))\s*")
@@ -497,7 +498,9 @@ _SHC = re.compile(r"^(?:ba|z)?sh\s+(?:-\w+\s+)*-\w*c\s+(['\"])(.*)\1\s*$", re.S)
 
 def is_heavy(text: str) -> bool:
     text = text.strip()
-    return not NOT_HEAVY.search(text) and any(rx.search(text) for rx in HEAVY_RES)
+    if NOT_HEAVY.search(text) or (re.search(r"(?:^|[\s/])tsc(?=\s|$)", text) and TSC_WATCH.search(text)):
+        return False
+    return any(rx.search(text) for rx in HEAVY_RES)
 
 
 def segments(cmd: str):
