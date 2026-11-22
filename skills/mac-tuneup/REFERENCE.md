@@ -43,3 +43,12 @@ the Claude app, Chrome and Claude Code sessions; some swap is normal.
 - Uptime > 7 days → suggest a restart.
 - A macOS update is waiting → the founder installs it (System Settings → General → Software Update).
 - If the healthy floor is still missed with 2 sessions and few tabs, the hardware is the limit (8 GB). Say so plainly.
+
+## Heavy-job gate and brake ledger (2026-11-22)
+
+Source: `cloud-kit/bin/heavy-run`, `cloud-kit/bin/memory-guard.py`, `cloud-kit/hooks/heavy_lib.py`, `heavy-gate.py`, `heavy-ledger-hook.py`. `~/bin/heavy-run`, `~/bin/heavy_lib.py` and `~/bin/memory-guard.py` are copies of the first three (after a merge, re-copy or symlink them from the main checkout; old guard backed up as `memory-guard.py.bak-20261122`).
+
+- `~/bin/heavy-run <cmd>` takes one of K slots (default 2, `HEAVY_RUN_SLOTS`, or `~/.local/share/memory-guard/heavy-run.conf`), FIFO. It waits while slots are full, or while another heavy job runs and pressure is critical or swap is over `HEAVY_RUN_SWAP_MB` (4500, brake line is 5000). An idle gate always lets one job through. Direct `jest` gets `--maxWorkers=2`. Exit 75 = still queued after the wait budget; re-run the same command and it keeps its place. `heavy-run --status` shows slots, queue and open brake kills.
+- Why K=2: Chrome + Claude app + Claude Code already use about 7 GB; logged swap median is 3.1 GB and 8 % of recent samples are over the 5 GB brake line. A jest run is 0.3 to 1.7 GB, tsc 0.7 to 0.9 GB, eslint 0.6 GB.
+- `heavy-gate.py` (PreToolUse on Bash, ctx_execute, ctx_batch_execute) wraps bare jest/tsc/eslint/vitest/`npm test`/build segments in `heavy-run`, including after `cd x &&`, in pipes and after `vault run --`. `HEAVY_GATE=off` disables. rtk-guard.sh skips its own rewrite for these commands so the two hooks don't race (backup `rtk-guard.sh.bak-20261122`).
+- The brake kills whole jobs (jest parent plus workers), biggest first, until about 2.5 GB is freed, and never touches jobs waiting in the gate. Each kill is a line in `~/.local/share/memory-guard/brake-ledger.jsonl`. A job run through heavy-run is re-queued automatically (2 retries, 150 s cooldown). `heavy-ledger-hook.py` reminds the chat whose worktree owns an open kill, blocks a "tests pass" finish while one is open (twice at most), and a green heavy-run in that worktree closes it. Entries expire after 48 h with a log line.

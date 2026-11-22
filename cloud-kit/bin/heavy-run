@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""heavy-run: wait your turn, then run a heavy dev job (jest, tsc, eslint, builds).
+
+  heavy-run [--budget=SECONDS] [--] <command...>
+  heavy-run --status
+
+Takes one of K slots (default 2, HEAVY_RUN_SLOTS), FIFO. Waits (sleeping between checks)
+while slots are full, or while other heavy jobs run and memory pressure is critical /
+swap is near the memory-guard brake line. Direct `jest` runs get --maxWorkers=2.
+If the memory brake kills the job, it is re-queued automatically (HEAVY_RUN_RETRIES);
+a green exit closes any open brake-ledger entry for this worktree.
+Exit 75 = still queued after --budget seconds: re-run the same command, it keeps its place.
+Config and state: see heavy_lib.py.
+"""
+import os
+import signal
+import subprocess
+import sys
+import time
+
+here = os.path.dirname(os.path.realpath(__file__))
+for cand in (here, os.path.join(here, "..", "hooks")):
+    if os.path.exists(os.path.join(cand, "heavy_lib.py")):
+        sys.path.insert(0, cand)
+        break
+import heavy_lib as hl  # noqa: E402
+
+
+def say(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+
+def status():
+    k = int(hl.cfg("HEAVY_RUN_SLOTS"))
+    level, swap = hl.pressure_and_swap()
+    jobs = hl.running_jobs(k)
+    print(f"slots {len(jobs)}/{k} busy, pressure={level}, swap={swap:.0f}MB (line {hl.cfg('HEAVY_RUN_SWAP_MB'):.0f})")
+    for j in jobs:
+        print(f"  running: {j.get('cmd', '?')[:100]}  ({j.get('cwd', '')})")
+    print(f"queued: {len(hl._live_tickets())}")
+    for e in hl.open_entries():
+        print(f"  un-rerun brake kill {e['id']}: {e['command'][:80]} in {e['worktree']}")
+
+
+def main(argv):
+    budget = hl.cfg("HEAVY_RUN_WAIT_BUDGET")
+    while argv and argv[0].startswith("--"):
+        opt = argv.pop(0)
+        if opt == "--":
+            break
+        if opt == "--status":
+            return status() or 0
+        if opt.startswith("--budget="):
+            try:
+                budget = float(opt.split("=", 1)[1])
+            except ValueError:
+                pass
+        else:
+            argv.insert(0, opt)
+            break
+    if not argv:
+        say(__doc__)
+        return 2
+    cwd = os.getcwd()
+    label = " ".join(argv)
+    argv = hl.cap_workers(argv)
+    retries = int(hl.cfg("HEAVY_RUN_RETRIES"))
+    attempt = 0
+    deadline = time.time() + budget if budget > 0 else None
+    while True:
+        remaining = 0 if deadline is None else max(deadline - time.time(), 1)
+        got = hl.acquire(label, cwd, remaining, say)
+        if got is None:
+            say(f"heavy-run: still queued after {budget:.0f}s (place kept ~{hl.cfg('HEAVY_RUN_TICKET_TTL_S'):.0f}s). "
+                "Re-run the same command to keep waiting.")
+            return 75
+        slot, fd = got
+        started = time.time()
+        try:
+            child = subprocess.Popen(argv, pass_fds=(fd,))  # child inherits the flock: slot stays held while it lives
+        except OSError as exc:
+            os.close(fd)
+            say(f"heavy-run: cannot run {argv[0]}: {exc}")
+            return 127
+        hl.write_record(fd, {"pid": os.getpid(), "child": child.pid, "cwd": cwd, "cmd": label,
+                             "start": int(started), "slot": slot})
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(sig, lambda s, _f, c=child: c.send_signal(s))
+        rc = child.wait()
+        os.close(fd)
+        if rc == 0:
+            hl.mark_done(cwd, label, os.getpid())
+            return 0
+        if hl.killed_since(os.getpid(), started):
+            if attempt < retries:
+                attempt += 1
+                cool = hl.cfg("HEAVY_RUN_RETRY_COOLDOWN_S")
+                say(f"heavy-run: the memory brake stopped `{label}`; re-queuing in {cool:.0f}s "
+                    f"(retry {attempt}/{retries}).")
+                time.sleep(cool)
+                continue
+            say(f"heavy-run: the memory brake stopped `{label}` {attempt + 1} times; it stays in the brake ledger "
+                "and your chat will be reminded to re-run it.")
+        return rc if rc >= 0 else 128 - rc
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

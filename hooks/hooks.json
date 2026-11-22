@@ -1,5 +1,5 @@
 {
-  "description": "High-Level mode session rules, plus the founder-correction checks (cloud-kit/hooks/correction-checks.py) on tool calls, replies and prompts.",
+  "description": "High-Level mode session rules, plus the founder-correction checks (cloud-kit/hooks/correction-checks.py) on tool calls, replies and prompts. Also the heavy-job gate (heavy-run) and brake-ledger hooks for the 8 GB Mac.",
   "hooks": {
     "SessionStart": [
       {
@@ -22,6 +22,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__plugin_context-mode_context-mode__ctx_execute|mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/heavy-gate.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -30,6 +40,16 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/heavy-ledger-hook.py\"",
             "timeout": 10
           }
         ]
@@ -44,6 +64,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/heavy-ledger-hook.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -52,6 +81,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/correction-checks.py\" --plugin",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/cloud-kit/hooks/heavy-ledger-hook.py\"",
             "timeout": 10
           }
         ]

@@ -10,6 +10,9 @@ cloud-kit/hooks/corrections.json
 cloud-kit/hooks/corrections_lib.py
 cloud-kit/hooks/eval-gate.json
 cloud-kit/hooks/eval-gate.py
+cloud-kit/hooks/heavy-gate.py
+cloud-kit/hooks/heavy-ledger-hook.py
+cloud-kit/hooks/heavy_lib.py
 cloud-kit/hooks/model-guard.py
 cloud-kit/hooks/serial-call-nudge.py
 cloud-kit/hooks/status-page-heartbeat.py
