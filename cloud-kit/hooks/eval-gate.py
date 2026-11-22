@@ -30,7 +30,10 @@ An eval "ran" only when a runner (npm, bun, deno, pytest, uv, vault ...) starts 
 match the eval's `ran` regex; `eval && git commit` counts, a commit message or a grep naming it does not.
 It "passed" on exit status 0. Where the harness reports no status (or `; true`, `| tee` hide it), the
 runner's own closing line decides (deno `ok | 42 passed | 0 failed`, pytest `13 passed in 1.2s`, vitest
-and jest `Tests ... passed`), else an N/M or N% score, and only when nothing after the eval printed.
+and jest `Tests ... passed`), else an N/M or N% score, and only when nothing before or after the eval
+printed. A closing line seen through grep, head or a tail of under 10 lines (deno: any tail) is not proof,
+and a coverage, INTERNALERROR, `error:` or unhandled-error line in the output makes it a fail.
+`python -c`, `node -e`, `deno eval` naming the eval are not runs of it.
 
 Unknown repos (anything not in eval-gate.json) are never touched. Fails OPEN on unreadable input or a
 git error (a gate bug must not block every commit). Off switch for the founder: EVAL_GATE_OFF=1.
@@ -84,17 +87,33 @@ YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b")
 PROMPT_WORD = re.compile(r"(?i)system|role|prompt|persona|instruction")
 LONG_YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b[^\n]{60,}")
 SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+(?!\d|\s*/))")  # 47/50 or 94% (not a date 11/18/26)
-ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Terminal escapes (CSI colour, OSC links, charset shifts) and stray control bytes; \n \r \t stay.
+ANSI = re.compile(r"\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()#][0-9A-Za-z]|[@-Z\\-_])"
+                  r"|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 # A test runner's own closing line. Some harnesses (and the cloud) report no exit status to the hook, and
 # deno / pytest / vitest / jest print no N/M score, so this line is the only proof of a pass there.
 RUN_SUMMARY = (
-    re.compile(r"^\s*(?:ok|FAILED)\s*\|\s*\d+ passed\b"),                                        # deno test
+    re.compile(r"^\s*(?:ok|FAILED)\s*\|\s*\d+ passed\b[^\n]*\|\s*\d+ failed\b"),                    # deno test
     re.compile(r"^[=\s]*(?:\d+ [a-z]+, )*\d+ (?:passed|failed|errors?)\b[^\n]*? in \d[\d.]*s\b"),  # pytest
     re.compile(r"^\s*Test(?:s| Suites| Files):?\s+[^\n]*\b\d+ (?:passed|failed)\b"),             # vitest, jest
     re.compile(r"^\s*Errors\s+\d+ errors?\b"),                                                   # vitest
 )
 RUN_BAD = re.compile(r"\b[1-9]\d* (?:failed|errors?)\b|^\s*FAILED\b")
 RUN_PASSED = re.compile(r"\b(\d+) passed\b")
+# A run that printed a pass count but still failed: deno `error:` after the tests, pytest INTERNALERROR or
+# Interrupted, a coverage threshold (pytest-cov, vitest, jest), vitest unhandled or type errors.
+RUN_ABORT = re.compile(
+    r"^\s*error(?:\[\w+\])?:\s|INTERNALERROR|^!+ [^\n]*\b(?:Interrupted|KeyboardInterrupt)\b"
+    r"|Required test coverage of [\d.]+% not reached|coverage threshold for \w+ \([\d.]+%\) not met"
+    r"|does not meet (?:global )?threshold|\bUnhandled (?:Errors?|Rejections?)\b|^\s*(?:Type )?Errors\s+[1-9]")
+# Each runner's count line comes with the line before it: vitest `Tests` after `Test Files`, jest `Tests:`
+# after `Test Suites:`. One without the other means a filter or the tail cut the line that could say failed.
+RUN_PAIRS = ((re.compile(r"^\s*Tests\s+\d"), re.compile(r"^\s*Test Files\s")),
+             (re.compile(r"^\s*Tests:"), re.compile(r"^\s*Test Suites:")))
+# Score look-alikes that are not scores: pytest progress `[100%]`, xdist `created: 4/4 workers`.
+NOT_SCORE = re.compile(r"\[\s*\d+%\]|\d+/\d+ workers\b")
+# `$(...)`, backticks, `<(...)`, `${X:?msg}`: a word that runs or prints something of its own.
+SUBST = re.compile(r"`|\$\(|[<>]\(|\$\{[^}]*\?|^\(")
 NONE_LINE = re.compile(r"(?i)\beval\s*:\s*none\b[^\n]{8,}")
 SKIPPED_LINE = re.compile(r"(?i)\beval\s*:\s*skipped\s*:\s*[^\n]{8,}")
 
@@ -244,7 +263,25 @@ def runs(words, e, depth=0):
     script = shell_c(w)
     if script is not None:
         return depth < 3 and any(runs(x, e, depth + 1) for _, x in segments(script))
-    return bool(w) and os.path.basename(w[0]) in RUNNERS and bool(re.search(e["ran"], " ".join(w)))
+    return (bool(w) and os.path.basename(w[0]) in RUNNERS and not inline_code(w)
+            and bool(re.search(e["ran"], " ".join(w))))
+
+
+def inline_code(w):
+    """`python -c '...'`, `node -e '...'`, `deno eval '...'`: the runner runs code from the command line, which
+    can print anything and name the eval in an argument, so it is not a run of the eval."""
+    if any(a in ("-e", "--eval", "--print") or a.startswith("--eval=") for a in w):
+        return True
+    if os.path.basename(w[0]) == "deno" and len(w) > 1 and w[1] in ("eval", "repl"):
+        return True
+    for i, a in enumerate(w):
+        if os.path.basename(a).startswith("python"):
+            j = i + 1
+            while j < len(w) and w[j].startswith("-") and w[j] != "-m":
+                if re.fullmatch(r"-[A-Za-z]*c", w[j]):
+                    return True
+                j += 2 if w[j] in ("-W", "-X") else 1
+    return False
 
 
 def flat_segments(cmd, depth=0):
@@ -568,6 +605,8 @@ PIPE_FILTERS = {"tee", "tail", "head", "grep"}
 
 
 def quiet_after(sep, words):
+    if any(SUBST.search(x) for x in words):  # `true "$(echo 47/50 >&2)"`, `tee >(sed ...)`
+        return False
     w = program(words) or [""]
     name = os.path.basename(w[0])
     if name in QUIET:
@@ -580,6 +619,44 @@ def quiet_after(sep, words):
     if name == "grep" and any(grep_reads_files(a) for a in w[1:]):
         return False
     return len(args) <= (1 if name == "grep" else 0)  # grep keeps its pattern; anything more is a file
+
+
+# Commands before an eval that print nothing (a bare VAR=x has no program, so its name is "").
+QUIET_BEFORE = QUIET | {"", "cd", "export", "unset", "set", "umask", "ulimit"}
+
+
+def quiet_before(words):
+    """With no exit status, an earlier command's output (`echo 'ok | 42 passed'; eval`, or an earlier run
+    that passed) would stand in for the eval's own, so only commands that print nothing may come first."""
+    w = program(words) or [""]
+    return os.path.basename(w[0]) in QUIET_BEFORE and not any(SUBST.search(x) for x in words)
+
+
+def whole_tail(sep, words, deno):
+    """After the eval, does this command pass on enough of the output for its closing line to be judged?
+    tee does; tail does when it keeps 10+ lines (or any suffix for deno, whose one line carries the failed
+    count). grep and head can drop the line that says failed, so a closing line seen through them is not
+    proof."""
+    if any(SUBST.search(x) for x in words):
+        return False
+    w = program(words) or [""]
+    name = os.path.basename(w[0])
+    if name in QUIET or (name == "tee" and sep == "|"):
+        return True
+    if name != "tail" or sep != "|" or not quiet_after(sep, words):
+        return False
+    n, args = 10, w[1:]
+    for i, a in enumerate(args):
+        m = re.fullmatch(r"-(?:n)?(\d+)|--lines=(\d+)", a)
+        if a.startswith(("-c", "--bytes", "+")) or a.startswith(("-n+", "--lines=+")):
+            return False
+        if m:
+            n = int(m.group(1) or m.group(2))
+        elif a in ("-n", "--lines") and i + 1 < len(args):
+            if not args[i + 1].isdigit():
+                return False
+            n = int(args[i + 1])
+    return deno or n >= 10
 
 
 GREP_FILE_LONG = ("--recursive", "--dereference-recursive", "--file", "--directories")
@@ -598,17 +675,23 @@ def grep_reads_files(arg):
 
 
 def run_summary(tail):
-    """What the runner's closing line(s) in `tail` say: None when there is none, else (passed, count).
-    Every summary line must be clean (a failed suite next to passing tests is a fail), and a run that
+    """What the runner's closing line(s) in `tail` say: None when there is none, else (passed, count, deno).
+    Every summary line must be clean (a failed suite next to passing tests is a fail), nothing else in the
+    tail may say the run broke (RUN_ABORT), each count line needs its partner (RUN_PAIRS), and a run that
     passed nothing is not a pass."""
-    lines = [l for l in ANSI.sub("", tail).splitlines() if any(p.match(l) for p in RUN_SUMMARY)]
+    all_lines = ANSI.sub("", tail).splitlines()
+    lines = [l for l in all_lines if any(p.match(l) for p in RUN_SUMMARY)]
     if not lines:
         return None
-    if any(RUN_BAD.search(l) for l in lines):
-        return (False, 0)
+    deno = all(RUN_SUMMARY[0].match(l) for l in lines)
+    if any(RUN_BAD.search(l) for l in lines) or any(RUN_ABORT.search(l) for l in all_lines):
+        return (False, 0, deno)
+    for count, partner in RUN_PAIRS:
+        if any(count.match(l) for l in lines) and not any(partner.match(l) for l in lines):
+            return (False, 0, deno)
     m = RUN_PASSED.search(lines[-1])
     n = int(m.group(1)) if m else 0
-    return (n > 0, n)
+    return (n > 0, n, deno)
 
 
 def post(tool, inp, resp, cwd, reg):
@@ -625,9 +708,9 @@ def post(tool, inp, resp, cwd, reg):
             if runs(w, e):
                 # The exit status is the eval's only when nothing after it can overwrite it (`; true`, `|| x`, `| tee`).
                 after = segs[i + 1:]
-                # A later command that prints (`echo 47/50`) could fake the score when the status is masked.
-                quiet = all(quiet_after(sep, x) for sep, x in after)
-                hits[e["name"]] = (all(s == "&&" for s, _ in after), quiet)
+                # A command before or after that prints (`echo 47/50`) could fake the score when the status is masked.
+                quiet = all(quiet_after(sep, x) for sep, x in after) and all(quiet_before(x) for _, x in segs[:i])
+                hits[e["name"]] = (all(s == "&&" for s, _ in after), quiet, after)
     if not hits:
         return
     out, code = "", None
@@ -642,17 +725,19 @@ def post(tool, inp, resp, cwd, reg):
     elif isinstance(resp, str):
         out = resp
     tail = out[-600:]
-    m = SCORE.search(tail)
+    # Judge whole lines only: a cut through `3 failed, 10 passed in 2s` must not leave `10 passed in 2s`.
+    whole = tail.split("\n", 1)[-1] if len(out) > 600 and out[-601] != "\n" else tail
+    m = SCORE.search(NOT_SCORE.sub("", whole))
     score = m.group(0) if m else None
-    summary = run_summary(tail)
+    summary = run_summary(whole)
     if summary and summary[0] and score is None:
         score = f"{summary[1]}/{summary[1]}"
     state = load_state()
-    for n, (observable, quiet) in hits.items():
+    for n, (observable, quiet, after) in hits.items():
         if observable and code is not None:
             ok = code == 0
         elif summary is not None:  # status masked or not reported: the runner's own closing line decides
-            ok = summary[0] and quiet
+            ok = summary[0] and quiet and all(whole_tail(sep, x, summary[2]) for sep, x in after)
         else:  # no closing line either: believe a score only if nothing after the eval printed
             ok = score is not None and quiet
         state.setdefault(repo, {})[n] = {"ts": time.time(), "cmd": cmd[:300], "tail": tail,
