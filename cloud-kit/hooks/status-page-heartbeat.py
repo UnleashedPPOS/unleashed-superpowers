@@ -206,9 +206,9 @@ def decide(payload, now):
             st["fired"] = st["wts"]
             out = {"decision": "block", "reason": (
                 "[status-page] Work happened after the status page was last updated. Before ending: ship-check "
-                "first if code changed, then update the page (finished items into Done, drop finished Needs you "
-                f"steps, what is still running under Still open). {where(st)} No Artifact tool (cloud): put it in the "
-                "PR description instead. Then a 1-2 line reply. Skip the republish only if nothing the founder "
+                "first if code changed, then update the page (delete finished items and log them in the done log, "
+                f"keep what is still running under Still open, fix the count headline). {where(st)} No Artifact tool (cloud): put it in the "
+                "PR description instead. Then a one-line reply with the link. Skip the republish only if nothing the founder "
                 "would notice changed.")}
     elif st["turn"] and st["work"]:
         last = max(st["turn"], st["pub"], st["nudge"])
@@ -217,7 +217,7 @@ def decide(payload, now):
             st["nudge"] = now
             out = {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": (
                 f"[status-page] {mins} min of work since the status page was last updated. Republish it now "
-                "with progress: done items into Done, what is in flight (including side sessions and sub-agents "
+                "with progress: finished items deleted and logged, what is in flight (including side sessions and sub-agents "
                 f"you started) under Still open. {where(st)} No chat text. No Artifact tool (cloud): update the "
                 "PR description instead. Sub-agents: ignore this, return status to the parent.")}}
     save(st, state_dir, state_path)
