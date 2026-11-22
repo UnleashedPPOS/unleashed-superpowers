@@ -104,6 +104,8 @@ Founder corrections are enforced, not just written down. [`cloud-kit/hooks/corre
 
 Outcome gate: [`cloud-kit/hooks/eval-gate.py`](cloud-kit/hooks/eval-gate.py) blocks a commit or PR that changes an LLM prompt or model in a product repo until that repo's eval has run, and the PR body must carry the score. It runs offline in the cloud and live through `vault run` locally. The per-repo eval commands are in [`cloud-kit/hooks/eval-gate.json`](cloud-kit/hooks/eval-gate.json), with a table in the `llm-provider-chain` skill. Lane, routine and sub-agent briefs state the goal, the constraints and a success check; the template is in the `where-work-runs` skill.
 
+Chief reporting: [`cloud-kit/hooks/chief-cloud-report.py`](cloud-kit/hooks/chief-cloud-report.py) makes a cloud chat report in to Chief (session start, heartbeat every 5 min, end) when `CHIEF_INGEST_CLOUD_TOKEN` is set; unset, it does nothing. Write-only token, 3 s timeout, never blocks or prints the token.
+
 Tests: `python3 -m unittest discover -s tests/hooks && python3 -m unittest discover -s tests/learning`.
 
 ## Definition of Done
