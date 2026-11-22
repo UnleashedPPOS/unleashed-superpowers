@@ -12,9 +12,11 @@ cloud-kit one.
 - Short network timeout, every error swallowed, always exits 0, prints nothing: it can't block a session.
 - Stop heartbeats are throttled to one per 5 minutes per session (stamp file in ~/.claude/state).
 - Skips Chief's own runner sessions (CHIEF_RUNNER=1, CHIEF_JOB_ID) and CHIEF_LEDGER_SKIP=1.
-CHIEF_INGEST_URL overrides the endpoint (tests). Event shape: scripts/chief/work-lib.mjs in unleashed-os-mobile.
+CHIEF_INGEST_URL overrides the endpoint (tests): https only, or plain http to 127.0.0.1/localhost;
+anything else falls back to the default so the token never goes to an arbitrary or cleartext host. Event shape: scripts/chief/work-lib.mjs in unleashed-os-mobile.
 """
 import json, os, re, socket, subprocess, sys, time
+import urllib.parse
 import urllib.request
 
 DEFAULT_URL = "https://xeyvuubsaxvszjgwjjaf.supabase.co/functions/v1/chief-ledger-ingest"
@@ -41,6 +43,18 @@ def git(cwd, *args):
 def repo_of(url):
     m = re.search(r"[/:]([^/:\s]+)/([^/\s]+?)(?:\.git)?/?$", url or "")
     return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def ingest_url(raw):
+    try:
+        u = urllib.parse.urlsplit(raw or "")
+    except ValueError:
+        return DEFAULT_URL
+    if u.scheme == "https" and u.hostname:
+        return raw
+    if u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost", "::1"):
+        return raw
+    return DEFAULT_URL
 
 
 def throttled(session, now):
@@ -90,7 +104,7 @@ def main():
         event["model"] = clip(hook["model"], 120)
     body = json.dumps({"op": "work", "event": {k: v for k, v in event.items() if v}}).encode()
     req = urllib.request.Request(
-        env.get("CHIEF_INGEST_URL") or DEFAULT_URL,
+        ingest_url(env.get("CHIEF_INGEST_URL")),
         data=body,
         method="POST",
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token},

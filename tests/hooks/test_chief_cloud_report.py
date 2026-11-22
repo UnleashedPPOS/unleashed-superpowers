@@ -120,5 +120,47 @@ class ChiefCloudReport(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
 
 
+    def test_override_url_cannot_leak_token_to_cleartext_or_other_schemes(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("chief_cloud_report", HOOK)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for bad in ("http://evil.example/x", "http://10.0.0.5/x", "file:///etc/passwd", "ftp://h/x", "https://", "", None):
+            self.assertEqual(mod.ingest_url(bad), mod.DEFAULT_URL, bad)
+        for ok in ("https://example.test/fn", "http://127.0.0.1:9/x", "http://localhost:9/x"):
+            self.assertEqual(mod.ingest_url(ok), ok)
+
+    def test_disallowed_override_posts_to_default_not_override(self):
+        import importlib.util, io
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location("chief_cloud_report", HOOK)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        bad_hits = []
+
+        class Bad(BaseHTTPRequestHandler):
+            def do_POST(self):
+                bad_hits.append(self.headers.get("Authorization"))
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        bad_srv = HTTPServer(("127.0.0.2", 0), Bad)
+        threading.Thread(target=bad_srv.serve_forever, daemon=True).start()
+        try:
+            mod.DEFAULT_URL = self.url
+            env = {"HOME": self.home, "CHIEF_INGEST_CLOUD_TOKEN": TOKEN, "CHIEF_INGEST_URL": f"http://127.0.0.2:{bad_srv.server_port}/"}
+            stdin = io.StringIO(json.dumps({"hook_event_name": "SessionStart", "session_id": "s9", "cwd": self.home}))
+            with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(sys, "stdin", stdin):
+                mod.main()
+        finally:
+            bad_srv.shutdown()
+        self.assertEqual(bad_hits, [])
+        self.assertEqual(len(Capture.hits), 1)
+        self.assertEqual(Capture.hits[0]["body"]["event"]["session_id"], "s9")
+
+
 if __name__ == "__main__":
     unittest.main()
