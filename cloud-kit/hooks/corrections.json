@@ -436,7 +436,7 @@
    "surface": "reply",
    "action": "block",
    "check": "fn:status_in_chat",
-   "message": "Status sections written in chat while a status page exists. Put them on the page; chat gets 1-2 lines.",
+   "message": "Status sections written in chat while a status page exists. Put them on the page; chat gets one line plus the link.",
    "bad": [
     {
      "text": "**Done:** importer live (PR #4)\n**Remaining:** none\n**Needs you:** nothing",

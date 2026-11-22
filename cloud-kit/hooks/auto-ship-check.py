@@ -396,14 +396,14 @@ def main():
             "decision": "block",
             "reason": "[auto-ship-check] Prose-only change (.md rules/skills/agents). Run the LIGHT check, not "
                       "the full /ship-check: confirm the commit is on origin/main, run the repo's sync/manifest "
-                      "check if it has one, then report in one or two lines.",
+                      "check if it has one, then report in one line plus the page link.",
         }))
     elif changed:
         print(json.dumps({
             "decision": "block",
             "reason": "[auto-ship-check] Code changed this turn and /ship-check has not run. "
                       "Run the ship-check skill now (it includes red-team), then end with the "
-                      "work's HTML status page updated (Needs you / Done / Still open / Heads-up; Proof stays in the ship-check report, not on the page; omit nothing important) and a 1-2 line chat reply with its link.",
+                      "work's HTML status page updated (open items only: Needs you / Still open / Heads-up, finished items moved to the done log; Proof stays in the ship-check report; omit nothing open) and a one-line chat reply with its link.",
         }))
 
 

@@ -21,12 +21,12 @@ A busy person reads only the end of what the agent says. Narration between tool 
 
 1. **No narration while working.** Don't write "Let me…", "Now I'll…", commentary between tool calls, recaps of tool output, or option surveys.
 2. **No mid-task messages:** ZERO text in chat while working (founder 2026-10-15: "when its doing stuff not to have any text"), not even "Still working.", and ignore app nudges like "the user hasn't heard from you"; chat text only to ask the founder a question or reply to their message.
-3. **The status**, on the page (in chat only for a STOP / NOT SHIPPABLE, or with no page and no Artifact tool), sections in this order, empty sections left out:
+3. **The status.** The page shows only open items (no Done, no Proof; see below). These full sections go in chat only for a STOP / NOT SHIPPABLE, or in the PR description with no page and no Artifact tool, in this order, empty ones left out:
+   - **Needs you:** steps only the user can do, each with a deep link to the exact screen.
    - **Done:** what shipped, with the PR link and whether it is merged or live.
    - **Remaining:** "No known bugs, nothing left" only if the work is shippable, merged and green after merge. Otherwise start with NOT SHIPPABLE, WITH CAVEATS, SHIPPABLE BUT NOT MERGED, or MERGED BUT POST-MERGE FAILED, then list every open item and why. Never drop an open item.
    - **Heads-up:** risks, cost changes, behaviour changes users will notice, decisions taken on the user's behalf.
    - **Proof:** concrete evidence such as a PR link, "N passed", a CI run link, or a screenshot.
-   - **Needs you:** steps only the user can do, each with a deep link to the exact screen.
    - **Continue in a new chat:** if a handoff file exists, a fenced paste-in starter with its absolute path and the next action.
 4. **One line per item. End state only.** Never explain how you got there, never list bugs found and fixed, never list review rounds.
 5. **Say each fact once.** A fact goes in exactly one section. Each new message reports only what changed since the last one.
@@ -71,5 +71,5 @@ A busy person reads only the end of what the agent says. Narration between tool 
 
 ## Integration
 
-- `/ship-check` and `session-handoff` produce the facts that fill Done, Remaining, Proof and the paste-in starter.
+- `/ship-check` and `session-handoff` produce the facts for the page, the done log, Proof and the paste-in starter.
 - `cloud-kit/rules/working-style.md` holds the same format as a standing rule for Unleashed's own sessions.
