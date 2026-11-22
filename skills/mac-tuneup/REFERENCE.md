@@ -7,7 +7,7 @@ the Claude app, Chrome and Claude Code sessions; some swap is normal.
 
 | Job | What it does |
 |---|---|
-| `com.elliotkelly.memory-guard` → `~/bin/memory-guard.py` | Every 2 min. Kills dev-tool processes (MCP servers, wrangler, esbuild, test workers) orphaned 10+ min. Notifies on critical pressure or swap > 6 GB, at most every 30 min. Log `~/Library/Logs/memory-guard.log` ("pressure=warning" lines are normal on 8 GB). |
+| `com.elliotkelly.memory-guard` → `~/bin/memory-guard.py` | Every 60 s. Kills dev-tool processes (MCP servers, wrangler, esbuild, test workers) orphaned 10+ min. Notifies on critical pressure or swap > 6 GB, at most every 30 min. Log `~/Library/Logs/memory-guard.log` ("pressure=warning" lines are normal on 8 GB). |
 | `com.elliotkelly.mac-health-watchdog` → `~/bin/mac-health-watchdog.sh` | Daily; runs `~/bin/disk-maintenance.sh`. |
 | `~/bin/disk-maintenance.sh` | Removes idle worktrees (2 days), rebuildable deps in idle repos (3 days), offloads repos untouched 10 days to GitHub-only. Never touches unpushed work. `report`, `--dry-run`, `restore <repo>`, `list-offloaded`. Keep-list `~/Developer/.offload-keep`. Not in git. |
 | `com.elliotkelly.chrome-cache-janitor` | Trims Chrome caches. |
@@ -43,3 +43,12 @@ the Claude app, Chrome and Claude Code sessions; some swap is normal.
 - Uptime > 7 days → suggest a restart.
 - A macOS update is waiting → the founder installs it (System Settings → General → Software Update).
 - If the healthy floor is still missed with 2 sessions and few tabs, the hardware is the limit (8 GB). Say so plainly.
+
+## Heavy-job gate and brake ledger (2026-11-22)
+
+Source: `cloud-kit/bin/heavy-run`, `cloud-kit/bin/memory-guard.py`, `cloud-kit/hooks/heavy_lib.py`, `heavy-gate.py`, `heavy-ledger-hook.py`. `~/bin/heavy-run`, `~/bin/heavy_lib.py` and `~/bin/memory-guard.py` are copies of the first three (after a merge, re-copy or symlink them from the main checkout; old guard backed up as `memory-guard.py.bak-20261122`).
+
+- `~/bin/heavy-run <cmd>` takes one of K slots (default 2, `HEAVY_RUN_SLOTS`, or `~/.local/share/memory-guard/heavy-run.conf`), FIFO. It waits while slots are full, or while another heavy job runs and pressure is critical or swap is over `HEAVY_RUN_SWAP_MB` (4500, brake line is 5000). An idle gate always lets one job through. Direct `jest` gets `--maxWorkers=2`. Exit 75 = still queued after the wait budget; re-run the same command and it keeps its place. `heavy-run --status` shows slots, queue and open brake kills.
+- Why K=2: Chrome + Claude app + Claude Code already use about 7 GB; logged swap median is 3.1 GB and 8 % of recent samples are over the 5 GB brake line. A jest run is 0.3 to 1.7 GB, tsc 0.7 to 0.9 GB, eslint 0.6 GB.
+- `heavy-gate.py` (PreToolUse on Bash, ctx_execute, ctx_batch_execute) wraps bare jest/tsc/eslint/vitest/`npm test`/build segments in `heavy-run`, including after `cd x &&`, in pipes and after `vault run --`. `HEAVY_GATE=off` disables. rtk-guard.sh skips its own rewrite for these commands so the two hooks don't race (backup `rtk-guard.sh.bak-20261122`).
+- The brake kills whole jobs (jest parent plus workers), at most one job per 60 s cycle, aiming to free about 900 MB. It brakes only at critical pressure, or when swap is over 5 GB and 2+ jobs run (a lone job is never killed for swap alone); with 2+ jobs the oldest is spared and the biggest of the rest goes first. Jobs waiting in the gate are never touched. Each kill is a line in `~/.local/share/memory-guard/brake-ledger.jsonl` (rotated at 256 KB, open kills carried over). Foreground heavy-run (tool call, wait budget min(30 s, 25 % of the tool timeout)) exits and leaves the re-run to the ledger; a background heavy-run re-queues itself (2 retries, 150 s cooldown) but only for test/lint/typecheck labels, never `test:db`, migrations, builds or deploys. `heavy-ledger-hook.py` reminds the chat whose worktree owns an open kill, blocks a "tests pass" finish while one is open (twice at most), and a green heavy-run with the same command in that worktree closes it. Entries expire after 48 h with a log line.

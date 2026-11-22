@@ -106,6 +106,8 @@ Outcome gate: [`cloud-kit/hooks/eval-gate.py`](cloud-kit/hooks/eval-gate.py) blo
 
 Chief reporting: [`cloud-kit/hooks/chief-cloud-report.py`](cloud-kit/hooks/chief-cloud-report.py) makes a cloud chat report in to Chief (session start, heartbeat every 5 min, end) when `CHIEF_INGEST_CLOUD_TOKEN` is set; unset, it does nothing. Write-only token, 3 s timeout, never blocks or prints the token.
 
+Heavy-job gate: [`cloud-kit/bin/heavy-run`](cloud-kit/bin/heavy-run) makes jest/tsc/eslint/builds wait their turn (2 slots, memory-aware) on the 8 GB Mac; [`heavy-gate.py`](cloud-kit/hooks/heavy-gate.py) routes bare heavy commands through it, and [`heavy-ledger-hook.py`](cloud-kit/hooks/heavy-ledger-hook.py) makes sure a job the memory brake killed is re-run before a chat claims tests pass. Details in `skills/mac-tuneup/REFERENCE.md`.
+
 Tests: `python3 -m unittest discover -s tests/hooks && python3 -m unittest discover -s tests/learning`.
 
 ## Definition of Done
