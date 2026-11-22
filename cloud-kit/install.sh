@@ -108,6 +108,9 @@ ensure("PostToolUse", "/.claude/hooks/context-size-nudge.py", f'"{cl}/hooks/cont
 ensure("PostToolUse", "/.claude/hooks/serial-call-nudge.py", f'"{cl}/hooks/serial-call-nudge.py"', timeout=10)
 ensure("PostToolUse", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
 ensure("Stop", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-page-heartbeat.py"', timeout=10)
+# Cloud chats report to Chief when CHIEF_INGEST_CLOUD_TOKEN is set (silent no-op otherwise).
+for ev in ("SessionStart", "Stop", "SessionEnd"):
+    ensure(ev, "/.claude/hooks/chief-cloud-report.py", f'"{cl}/hooks/chief-cloud-report.py"', timeout=10)
 # Founder corrections enforced as checks (registry: hooks/corrections.json); one script, four events.
 for ev in ("PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit"):
     ensure(ev, "/.claude/hooks/correction-checks.py", f'"{cl}/hooks/correction-checks.py"', timeout=10)
