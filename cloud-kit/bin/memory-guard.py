@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """memory-guard: keep the 8 GB Mac from freezing under heavy multi-session work.
 
-Runs every 2 minutes from launchd (com.elliotkelly.memory-guard).
+Runs every 60 s from launchd (com.elliotkelly.memory-guard).
 
 1. Reaps orphaned dev-tool processes: tool servers (MCP), wrangler, esbuild,
    test workers, etc. whose parent died (reparented to launchd, ppid 1) and
@@ -263,7 +263,8 @@ def send_alert(title: str, body: str) -> None:
 # BRAKE_FREE_MB is freed. Apps, editors, Claude, MCP servers, xcodebuild and
 # EAS builds are never touched. Each killed job goes in the brake ledger; the owning chat is told to re-run it.
 BRAKE_SWAP_MB = 5000
-BRAKE_FREE_MB = 2500
+BRAKE_FREE_MB = 900  # biggest single job seen 897 MB, biggest event total 1656 MB
+BRAKE_MAX_KILLS_PER_CYCLE = 1  # kill one job, then re-check next cycle
 BRAKE_PATTERNS = re.compile(
     r"jest-worker|/jest(\.js)?\b|jest/bin|\bjest\b|/tsc\b|typescript/bin/tsc|tsserver\.js"
     r"|vitest|eslint|expo(/bin/cli)? export|expo-router.*export|metro|webpack|next build|next-server"
@@ -273,14 +274,26 @@ BUILD_SPARE = re.compile(r"export|metro|react-native bundle|/tmp/.*eas-build|eas
 BRAKE_NEVER = re.compile(r"xcodebuild|eas-cli|eas build|EAS_BUILD|Claude\.app|/claude\b|mcp|heavy-run")
 
 
+def etime_s(text: str) -> int:
+    """ps etime ([[dd-]hh:]mm:ss) -> seconds."""
+    days, _, rest = text.rpartition("-")
+    try:
+        secs = 0
+        for n in [int(x) for x in rest.split(":")]:
+            secs = secs * 60 + n
+        return secs + (int(days) * 86400 if days else 0)
+    except ValueError:
+        return 0
+
+
 def ps_table() -> dict:
-    """pid -> (ppid, rss_mb, command)."""
+    """pid -> (ppid, rss_mb, command, age_s)."""
     table = {}
-    for line in out(["ps", "-axo", "pid=,ppid=,rss=,command="]).splitlines():
-        parts = line.split(None, 3)
-        if len(parts) < 4 or not all(p.isdigit() for p in parts[:3]):
+    for line in out(["ps", "-axo", "pid=,ppid=,rss=,etime=,command="]).splitlines():
+        parts = line.split(None, 4)
+        if len(parts) < 5 or not all(p.isdigit() for p in parts[:3]):
             continue
-        table[int(parts[0])] = (int(parts[1]), int(parts[2]) / 1024, parts[3])
+        table[int(parts[0])] = (int(parts[1]), int(parts[2]) / 1024, parts[4], etime_s(parts[3]))
     return table
 
 
@@ -291,14 +304,14 @@ def pid_cwd(pid: int) -> str:
     return ""
 
 
-def brake(dry_run: bool) -> int:
-    """Kill whole heavy JOBS (a jest run = parent + workers), biggest job first, until about
-    BRAKE_FREE_MB is freed. Jobs waiting in the heavy-run gate are not processes of these
-    programs, so they are never touched. Every killed job is written to the brake ledger so
-    the owning chat re-runs it (see heavy-ledger-hook.py)."""
+def brake(dry_run: bool, critical: bool = True) -> int:
+    """Kill whole heavy JOBS (a jest run = parent + workers). Never on swap alone with fewer than 2 jobs
+    (killing a lone job just makes it start again and die again); the oldest job is spared when there are
+    2+, the biggest of the rest goes first, and at most BRAKE_MAX_KILLS_PER_CYCLE die per run. Jobs waiting
+    in the heavy-run gate are not processes of these programs, so they are never touched."""
     table = ps_table()
     heavy = set()
-    for pid, (_ppid, _rss, command) in table.items():
+    for pid, (_ppid, _rss, command, _age) in table.items():
         prog = os.path.basename(command.split()[0])
         if prog not in {"node", "bun", "deno", "npx", "npm"} and "node" not in prog:
             continue
@@ -318,11 +331,16 @@ def brake(dry_run: bool) -> int:
     jobs: dict = {}
     for pid in heavy:
         jobs.setdefault(root(pid), []).append(pid)
+    if not critical and len(jobs) < 2:
+        return 0
     records = heavy_lib.gate_records() if heavy_lib else []
     ranked = sorted(jobs.items(), key=lambda kv: -sum(table[p][1] for p in kv[1]))
+    if len(ranked) >= 2:
+        oldest = max(jobs, key=lambda r: table[r][3])
+        ranked = [kv for kv in ranked if kv[0] != oldest]
     freed, killed = 0.0, 0
     for root_pid, members in ranked:
-        if freed >= BRAKE_FREE_MB:
+        if freed >= BRAKE_FREE_MB or killed >= BRAKE_MAX_KILLS_PER_CYCLE:
             break
         size = sum(table[p][1] for p in members)
         # Map the job back to a heavy-run slot (record.child is the job or an ancestor of it).
@@ -357,7 +375,7 @@ def main() -> None:
     level = pressure_level()
     swap = swap_used_mb()
     if level >= 4 or swap > BRAKE_SWAP_MB:
-        braked = brake(dry_run)
+        braked = brake(dry_run, critical=level >= 4)
         if braked and not dry_run:
             send_alert("Memory brake", f"Stopped {braked} heavy test/build jobs to keep the Mac alive.")
     if level >= 2 or swap > SWAP_ALERT_MB:

@@ -179,6 +179,16 @@ def job_key(cwd: str, cmd: str) -> str:
     return hashlib.sha1(f"{cwd}\0{cmd}".encode()).hexdigest()[:10]
 
 
+def _owner_alive(name: str) -> bool:
+    try:
+        os.kill(int((queue_dir() / name).read_text().strip() or 0), 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def _live_tickets() -> list:
     ttl = cfg("HEAVY_RUN_TICKET_TTL_S")
     now = time.time()
@@ -204,9 +214,10 @@ def join_queue(key: str) -> str:
     queue_dir().mkdir(parents=True, exist_ok=True)
     for name in _live_tickets():
         if name.endswith(f"-{key}.t"):
+            (queue_dir() / name).write_text(str(os.getpid()))  # adopt the kept place
             return name
     name = f"{time.time_ns():020d}-{key}.t"
-    (queue_dir() / name).touch()
+    (queue_dir() / name).write_text(str(os.getpid()))
     return name
 
 
@@ -215,11 +226,13 @@ def refresh(ticket: str) -> None:
         os.utime(queue_dir() / ticket)
     except OSError:
         (queue_dir()).mkdir(parents=True, exist_ok=True)
-        (queue_dir() / ticket).touch()
+        (queue_dir() / ticket).write_text(str(os.getpid()))
 
 
 def position(ticket: str) -> int:
-    live = _live_tickets()
+    # A ticket whose owner is gone (a waiter that exited 75) keeps its place for a re-run of the same
+    # command but never blocks the head of the line for others.
+    live = [n for n in _live_tickets() if n == ticket or _owner_alive(n)]
     return live.index(ticket) + 1 if ticket in live else len(live) + 1
 
 
@@ -300,6 +313,19 @@ def kind_of(cmd: str) -> str:
     return "other"
 
 
+RETRY_SCRIPTS = {"test", "tests", "lint", "typecheck", "type-check", "tsc"}
+
+
+def retry_safe(label: str) -> bool:
+    """Auto-retry only pure test/typecheck/lint runs. Never `test:db` (runs migrations), builds, deploys."""
+    if re.search(r"migrat|deploy|seed|db:", label):
+        return False
+    m = SCRIPT.match(label.strip())
+    if m:
+        return m.group(1) in RETRY_SCRIPTS
+    return kind_of(label) in {"jest", "tsc", "eslint", "vitest"}
+
+
 WORKER_FLAGS = re.compile(r"(^|\s)(--maxWorkers\S*|-w\s*\S+|--runInBand|-i|--watch\S*|--watchAll)(\s|$)")
 JEST_WORD = re.compile(r"(?:^|[\s/])jest$")
 
@@ -369,9 +395,30 @@ def read_events() -> list:
     return out
 
 
+def rotate_ledger(max_bytes: int = 256 * 1024) -> None:
+    """Keep the ledger small: archive the old file (.1) and carry only still-open kills into a fresh one."""
+    try:
+        if ledger_path().stat().st_size <= max_bytes:
+            return
+    except OSError:
+        return
+    events = read_events()
+    closed = {e.get("id") for e in events if e.get("event") in ("done", "expired")}
+    keep = [e for e in events if e.get("event") == "kill" and e.get("id") not in closed
+            and time.time() - e.get("time", 0) <= LEDGER_EXPIRY_S]
+    try:
+        os.replace(ledger_path(), str(ledger_path()) + ".1")
+    except OSError:
+        return
+    for e in keep:
+        append_event(e)
+
+
 def open_entries(now=None, expire: bool = True) -> list:
     """Kills nobody has re-run yet. Entries older than 48 h expire (event + log line)."""
     now = now or time.time()
+    if expire:
+        rotate_ledger()
     events = read_events()
     closed = {e.get("id") for e in events if e.get("event") in ("done", "expired")}
     out = []
@@ -387,6 +434,15 @@ def open_entries(now=None, expire: bool = True) -> list:
     return out
 
 
+def tool_args(cmd: str, kind: str) -> tuple:
+    """Arguments after the tool word (`npx jest a b` / `node x/jest.js a b` -> ('a','b')), minus injected worker caps."""
+    toks = cmd.split()
+    for i, t in enumerate(toks):
+        if re.search(r"(?:^|/)" + re.escape(kind) + r"(?:\.js)?$", t):
+            return tuple(a for a in toks[i + 1:] if not a.startswith("--maxWorkers"))
+    return ()
+
+
 def mark_done(cwd: str, command: str, by_pid=None) -> int:
     """A heavy-run in this worktree exited 0: close the open kills it re-ran."""
     wt = worktree_of(cwd)
@@ -394,8 +450,9 @@ def mark_done(cwd: str, command: str, by_pid=None) -> int:
     for e in open_entries(expire=False):
         if e.get("worktree") != wt:
             continue
-        if e.get("command") == command[:300] or (kind != "other" and e.get("kind") == kind) \
-                or (kind != "other" and kind_of(e.get("command", "")) == kind):
+        raw = e.get("heavy_run_pid") is None  # kill of a job not started via heavy-run: only its raw cmdline is known
+        if e.get("command") == command[:300] or (raw and kind != "other" and e.get("kind") == kind
+                                                 and tool_args(e.get("command", ""), kind) == tool_args(command, kind)):
             append_event({"event": "done", "id": e["id"], "time": int(time.time()), "by": command[:200], "pid": by_pid})
             n += 1
     return n
@@ -411,8 +468,7 @@ def owns(entry: dict, chat_cwd: str) -> bool:
     wt = entry.get("worktree") or ""
     if not wt or not chat_cwd:
         return False
-    c = os.path.realpath(chat_cwd)
-    return c == wt or c.startswith(wt + "/") or worktree_of(c) == wt
+    return worktree_of(chat_cwd) == wt  # same repo/worktree only: a nested worktree is a different chat
 
 
 # ---------------------------------------------------------------- command rewriting
@@ -428,11 +484,11 @@ HEAVY_RES = [
     re.compile(r"^(?:npx\s+|bunx\s+)?playwright\s+test\b"),
     re.compile(r"^(?:bun|deno)\s+test\b"),
     re.compile(r"^deno\s+check\b"),
-    re.compile(r"^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|tests|lint|typecheck|type-check|tsc|build|check|ci|build:check|test:\S+|lint:\S+)(?=\s|$)"),
+    re.compile(r"^(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|tests|lint|typecheck|type-check|tsc|build|check|build:check|test:\S+|lint:\S+)(?=\s|$)"),
 ]
-NOT_HEAVY = re.compile(r"(?:^|\s)(?:--help|-h|--version|-v|-V)(?=\s|$)")
+NOT_HEAVY = re.compile(r"(?:^|\s)(?:--help|-h|--version|-v|-V|-w|--watch\S*|--watchAll\S*)(?=\s|$)")
 _LEAD = re.compile(
-    r"\s*(?:(?:then|do|else|elif|if|while|until|!|time|exec|command|nohup|env|nice(?:\s+-n\s*-?\d+)?)(?=\s)"
+    r"\s*(?:(?:then|do|else|elif|if|while|until|!|\{|time|exec|command|nohup|env|nice(?:\s+-n\s*-?\d+)?)(?=\s)"
     r"|[A-Za-z_]\w*=(?:\"[^\"]*\"|'[^']*'|[^\s;&|]*)(?=\s))\s*")
 _HR = re.compile(r"^(?:\S*/)?heavy-run(?=\s|$)")
 _VAULT = re.compile(r"^(?:\S*/)?vault\s+run\b")
@@ -526,20 +582,76 @@ def wrap_prefix(budget) -> str:
     return f"{heavy_run_bin()} --budget={int(budget)} "
 
 
+HEREDOC_MARK = re.compile(r"<<(?!<)-?[ \t]*\\?(['\"]?)([A-Za-z_]\w*)\1")
+SHELL_READER = re.compile(r"^(?:\S*/)?(?:ba|z|da|k)?sh\b|^eval\b|^ssh\b|^source\b|^\.\s")
+
+
+def mask_heredocs(cmd: str):
+    """Blank out heredoc markers and bodies (same length, so offsets still line up). Returns
+    (masked, bodies fed to a shell) -- a body is only code when a shell reads it."""
+    lines = cmd.split("\n")
+    out, shell_bodies, i = [], [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        marks = list(HEREDOC_MARK.finditer(line))
+        if not marks:
+            continue
+        before = line[:marks[0].start()]
+        head = re.split(r"[;&|(]", before)[-1]
+        pos = 0
+        while True:
+            m = _LEAD.match(head, pos)
+            if not m or m.end() == pos:
+                break
+            pos = m.end()
+        reads_as_shell = bool(SHELL_READER.match(head[pos:].strip()))
+        for m in reversed(marks):  # blank markers (right to left keeps indices valid)
+            line = line[:m.start()] + " " * (m.end() - m.start()) + line[m.end():]
+        out[-1] = line
+        for m in marks:
+            body = []
+            while i < len(lines):
+                done = lines[i].strip() == m.group(2)
+                body.append(lines[i])
+                out.append(re.sub(r"[^\s]", " ", lines[i]))
+                i += 1
+                if done:
+                    break
+            if reads_as_shell:
+                shell_bodies.append("\n".join(body))
+    return "\n".join(out), shell_bodies
+
+
+def has_heavy(cmd: str) -> bool:
+    """True if any segment of cmd is a bare heavy job (used by rtk-guard.sh so only one hook rewrites it)."""
+    masked, _bodies = mask_heredocs(cmd)
+    return bool(_insert_points(masked))
+
+
 def rewrite_command(cmd: str, budget: float = 100):
     """Returns (new_command, None) when heavy commands were wrapped, (None, instruction) when rewriting
     isn't safe but the command looks heavy, or (None, None) to leave it alone."""
     if not cmd or not os.path.exists(heavy_run_bin()):
         return None, None
-    if segments(cmd) is None:
-        if "<<" in cmd and HEREDOC_HEAVY.search(cmd):
-            return None, ("heavy-run gate: this command mixes a heredoc with a heavy job (jest/tsc/eslint/build). "
-                          f"Put the heavy command on its own call, wrapped: {heavy_run_bin()} <command>")
+    masked, bodies = mask_heredocs(cmd)
+    for body in bodies:
+        if HEREDOC_HEAVY.search(body):
+            return None, ("heavy-run gate: a shell reads a heredoc that runs a heavy job (jest/tsc/eslint/build). "
+                          f"Run the heavy command on its own call, wrapped: {heavy_run_bin()} <command>")
+    if segments(masked) is None:
         return None, None
-    points = sorted(set(_insert_points(cmd)), reverse=True)
+    points = sorted(set(_insert_points(masked)), reverse=True)
     if not points:
         return None, None
     out = cmd
     for p in points:
         out = out[:p] + wrap_prefix(budget) + out[p:]
     return out, None
+
+
+if __name__ == "__main__":  # rtk-guard.sh: `python3 heavy_lib.py --has-heavy` reads the command on stdin; exit 0 = heavy
+    import sys
+    if "--has-heavy" in sys.argv:
+        sys.exit(0 if has_heavy(sys.stdin.read()) else 1)

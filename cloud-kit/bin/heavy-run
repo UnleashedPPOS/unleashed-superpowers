@@ -12,6 +12,7 @@ a green exit closes any open brake-ledger entry for this worktree.
 Exit 75 = still queued after --budget seconds: re-run the same command, it keeps its place.
 Config and state: see heavy_lib.py.
 """
+import fcntl
 import os
 import signal
 import subprocess
@@ -84,23 +85,32 @@ def main(argv):
             return 127
         hl.write_record(fd, {"pid": os.getpid(), "child": child.pid, "cwd": cwd, "cmd": label,
                              "start": int(started), "slot": slot})
+        old = {}
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-            signal.signal(sig, lambda s, _f, c=child: c.send_signal(s))
+            old[sig] = signal.signal(sig, lambda s, _f, c=child: c.send_signal(s))
         rc = child.wait()
+        for sig, handler in old.items():  # the child is gone: Ctrl-C / SIGTERM must work again
+            signal.signal(sig, handler)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)  # explicit: a background grandchild (`sleep 25 &`) still holds the open file
+        except OSError:
+            pass
         os.close(fd)
         if rc == 0:
             hl.mark_done(cwd, label, os.getpid())
             return 0
         if hl.killed_since(os.getpid(), started):
-            if attempt < retries:
+            # Foreground (finite budget): exit and rely on the ledger; the tool timeout is shorter than any
+            # cooldown. Retry in place only when unlimited (background), and only for pure test/lint/typecheck.
+            if budget <= 0 and hl.retry_safe(label) and attempt < retries:
                 attempt += 1
                 cool = hl.cfg("HEAVY_RUN_RETRY_COOLDOWN_S")
                 say(f"heavy-run: the memory brake stopped `{label}`; re-queuing in {cool:.0f}s "
                     f"(retry {attempt}/{retries}).")
                 time.sleep(cool)
                 continue
-            say(f"heavy-run: the memory brake stopped `{label}` {attempt + 1} times; it stays in the brake ledger "
-                "and your chat will be reminded to re-run it.")
+            say(f"heavy-run: the memory brake stopped `{label}`; it is in the brake ledger and your chat will be "
+                "reminded to re-run it through heavy-run.")
         return rc if rc >= 0 else 128 - rc
 
 

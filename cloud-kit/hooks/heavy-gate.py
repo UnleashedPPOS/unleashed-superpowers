@@ -24,7 +24,7 @@ def budget_for(inp):
         return 0
     ms = inp.get("timeout") or 120000
     try:
-        return max(int(ms) / 1000 - 20, 10)
+        return min(30, int(ms) / 1000 * 0.25)  # leave most of the tool timeout for the job itself
     except (TypeError, ValueError):
         return 100
 

@@ -4,7 +4,7 @@
 Run: python3 -m unittest discover -s tests/hooks -v
 Everything runs against a throwaway state dir (MEMORY_GUARD_STATE_DIR); no real process is killed.
 """
-import importlib.util, json, os, shutil, subprocess, sys, tempfile, time, unittest
+import importlib.util, json, os, shutil, signal, subprocess, sys, tempfile, time, unittest
 from unittest import mock
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -73,11 +73,47 @@ class RewriteTest(Base):
         new, _ = self.rw("bash -c 'cd a && npx jest'")
         self.assertEqual(new, f"{HEAVY_RUN} --budget=100 bash -c 'cd a && npx jest'")
 
-    def test_heredoc_with_heavy_is_denied_with_fix(self):
-        new, deny = self.rw("cat <<EOF > f\nx\nEOF\nnpm test")
+    def test_heredoc_read_by_a_shell_is_denied_with_fix(self):
+        new, deny = self.rw("bash <<EOF\nnpx jest\nEOF")
         self.assertIsNone(new)
         self.assertIn("heavy-run", deny)
         self.assertEqual(self.rw("cat <<EOF > f\nhello\nEOF"), (None, None))
+
+    def test_heredoc_text_is_not_code(self):
+        # a PR body that mentions `npm test` is prose, not a heavy job
+        self.assertEqual(self.rw("gh pr create --body-file - <<'EOF'\nrun npm test and npx tsc\nEOF"), (None, None))
+        # ...but a real heavy command after a cat heredoc is still wrapped
+        new, deny = self.rw("cat <<EOF > f\nx\nEOF\nnpx tsc")
+        self.assertIsNone(deny)
+        self.assertTrue(new.endswith(f"{HEAVY_RUN} --budget=100 npx tsc"), new)
+
+    def test_watch_modes_and_npm_ci_are_not_wrapped(self):
+        for cmd in ("npm ci", "npx jest --watch", "npx jest --watchAll", "tsc -w", "tsc --watch", "npx jest -w"):
+            self.assertEqual(self.rw(cmd), (None, None), cmd)
+
+    def test_brace_group_is_wrapped(self):
+        new, _ = self.rw("{ npx jest; }")
+        self.assertIn(f"{HEAVY_RUN} --budget=100 npx jest", new)
+
+    def test_has_heavy_cli_for_rtk_guard(self):
+        for cmd, rc in (("npm run build", 0), ("npx next build", 0), ("npx playwright test", 0),
+                        ("git status", 1), ("npm ci", 1), ("npx jest --watch", 1)):
+            r = subprocess.run([sys.executable, os.path.join(HOOKS, "heavy_lib.py"), "--has-heavy"], input=cmd,
+                               text=True, capture_output=True)
+            self.assertEqual(r.returncode, rc, cmd)
+
+    def test_budget_is_a_quarter_of_the_tool_timeout_capped_at_30s(self):
+        gate = load(os.path.join(HOOKS, "heavy-gate.py"), "heavy_gate_under_test")
+        self.assertEqual(gate.budget_for({"timeout": 120000}), 30)
+        self.assertEqual(gate.budget_for({"timeout": 40000}), 10)
+        self.assertEqual(gate.budget_for({}), 30)
+        self.assertEqual(gate.budget_for({"run_in_background": True}), 0)
+
+    def test_retry_safe_allowlist(self):
+        for ok in ("npm test", "npx jest a", "npm run lint", "npx tsc --noEmit"):
+            self.assertTrue(hl.retry_safe(ok), ok)
+        for bad in ("npm run test:db", "npm run migrate", "npm run build", "npx next build", "npm run db:reset"):
+            self.assertFalse(hl.retry_safe(bad), bad)
 
     def test_missing_binary_is_noop(self):
         with mock.patch.dict(os.environ, {"HEAVY_RUN_BIN": "/nonexistent/heavy-run"}):
@@ -122,11 +158,34 @@ class GateTest(Base):
         self.assertGreater(waited, 1.0)  # it really waited for the slot
 
     def test_two_slots_run_in_parallel(self):
-        t0 = time.time()
-        a = self.heavy("sleep", "1.5", wait=False, extra_env={"HEAVY_RUN_SLOTS": "2"})
-        b = self.heavy("sleep", "1.5", wait=False, extra_env={"HEAVY_RUN_SLOTS": "2"})
+        # rendezvous, not timing: each job waits (up to ~10 s) for the other's file, so it only passes if both run at once
+        pf = os.path.join(self.tmp, "pressure")
+        open(pf, "w").write("1 1000")
+        env = {"HEAVY_RUN_SLOTS": "2", "HEAVY_RUN_PRESSURE_FILE": pf}
+        fa, fb = os.path.join(self.tmp, "a"), os.path.join(self.tmp, "b")
+        job = 'touch "$1"; for i in $(seq 100); do [ -f "$2" ] && exit 0; sleep 0.1; done; exit 1'
+        a = self.heavy("sh", "-c", job, "x", fa, fb, wait=False, extra_env=env)
+        b = self.heavy("sh", "-c", job, "x", fb, fa, wait=False, extra_env=env)
         a.communicate(), b.communicate()
-        self.assertLess(time.time() - t0, 2.8)
+        self.assertEqual((a.returncode, b.returncode), (0, 0))
+
+    def test_slot_is_freed_when_the_job_exits_even_with_a_background_grandchild(self):
+        _o, _e, rc = self.heavy("sh", "-c", "sleep 4 >/dev/null 2>&1 &")
+        self.assertEqual(rc, 0)
+        t0 = time.time()
+        out, _e, rc = self.heavy("echo", "next", budget="2")
+        self.assertEqual((rc, out.strip()), (0, "next"))
+        self.assertLess(time.time() - t0, 2)
+
+    def test_dead_owner_ticket_at_the_head_does_not_block(self):
+        queue = os.path.join(self.env["MEMORY_GUARD_STATE_DIR"], "gate", "queue")
+        os.makedirs(queue)
+        open(os.path.join(queue, "00000000000000000001-ghost.t"), "w").write("999999")  # fresh mtime, dead owner
+        first = self.heavy("sleep", "1.5", wait=False)
+        time.sleep(0.4)
+        out, _e, rc = self.heavy("echo", "ok", budget="10")
+        first.communicate()
+        self.assertEqual((rc, out.strip()), (0, "ok"))
 
     def test_stale_lock_and_ticket_recovered(self):
         gate = os.path.join(self.env["MEMORY_GUARD_STATE_DIR"], "gate")
@@ -148,19 +207,29 @@ class GateTest(Base):
         self.assertEqual(len(hl._live_tickets()), 1)  # place in line kept
         first.communicate()
 
-    def test_critical_pressure_holds_new_jobs_while_one_runs(self):
+    def held_until_released(self, pressure):
         pf = os.path.join(self.tmp, "pressure")
-        open(pf, "w").write("4 9000")
+        open(pf, "w").write(pressure)
         env = {"HEAVY_RUN_PRESSURE_FILE": pf, "HEAVY_RUN_SLOTS": "2"}
         first = self.heavy("sleep", "4", wait=False, extra_env=env)
         time.sleep(0.6)
         second = self.heavy("echo", "late", wait=False, extra_env=env)
         time.sleep(1.5)
-        self.assertIsNone(second.poll())  # held: a free slot exists but pressure is critical
+        held = second.poll() is None  # a free slot exists but the gate holds the job
         open(pf, "w").write("1 1000")
         out, _ = second.communicate(timeout=10)
         first.communicate()
         self.assertIn("late", out)
+        return held
+
+    def test_critical_pressure_alone_holds_new_jobs(self):
+        self.assertTrue(self.held_until_released("4 100"))  # critical level, tiny swap
+
+    def test_swap_over_the_line_alone_holds_new_jobs(self):
+        self.assertTrue(self.held_until_released("1 9000"))  # calm level, swap over HEAVY_RUN_SWAP_MB
+
+    def test_calm_machine_does_not_hold(self):
+        self.assertFalse(self.held_until_released("1 1000"))
 
     def test_pressure_does_not_starve_an_idle_gate(self):
         pf = os.path.join(self.tmp, "pressure")
@@ -212,7 +281,7 @@ class LedgerTest(Base):
         script = os.path.join(self.wt, "jest")
         open(script, "w").write("#!/bin/sh\nexit 0\n")
         os.chmod(script, 0o755)
-        self.assertEqual(self.heavy("./jest")[2], 0)
+        self.assertEqual(self.heavy("./jest", "src/a")[2], 0)  # same arguments as the killed run
         self.assertEqual(hl.open_entries(), [])
         self.assertIsNone(self.hook("UserPromptSubmit", self.wt))
 
@@ -239,17 +308,85 @@ class LedgerTest(Base):
     def test_heavy_run_requeues_a_job_the_brake_killed(self):
         # The child "gets killed by the brake": it writes a ledger entry naming this heavy-run, then dies.
         marker = os.path.join(self.tmp, "ran-once")
-        script = os.path.join(self.tmp, "job.sh")
+        script = os.path.join(self.tmp, "jest")
         # heavy-run pid isn't known to the child, so use the parent pid ($PPID) via a tiny wrapper
         open(script, "w").write(
             f"#!/bin/sh\nif [ ! -f {marker} ]; then touch {marker}; "
             f"{sys.executable} -c \"import sys;sys.path.insert(0,'{HOOKS}');import heavy_lib as h;"
             f"h.record_kill('{self.wt}','{script}',1,1,1,$PPID)\"; kill -9 $$; fi\nexit 0\n")
         os.chmod(script, 0o755)
-        out, err, rc = self.heavy(script, extra_env={"HEAVY_RUN_RETRY_COOLDOWN_S": "0.2"})
+        out, err, rc = self.heavy(script, budget="0", extra_env={"HEAVY_RUN_RETRY_COOLDOWN_S": "0.2"})
         self.assertEqual(rc, 0, err)
         self.assertIn("memory brake stopped", err)
         self.assertEqual(hl.open_entries(), [])  # killed -> re-queued -> green -> entry closed
+
+
+class LedgerFixesTest(Base):
+    kill = LedgerTest.kill
+
+    def test_green_partial_run_does_not_close_a_killed_full_run(self):
+        e = self.kill(command="npx jest", hr=4242)
+        self.assertEqual(hl.mark_done(self.wt, "npx jest one.test.ts"), 0)
+        self.assertEqual([x["id"] for x in hl.open_entries()], [e["id"]])
+        self.assertEqual(hl.mark_done(self.wt, "npx jest"), 1)  # exact label closes it
+        self.assertEqual(hl.open_entries(), [])
+
+    def test_raw_kill_is_not_closed_by_a_different_argument_run(self):
+        e = self.kill(command="npx jest")
+        self.assertEqual(hl.mark_done(self.wt, "npx jest only/this.test.ts"), 0)
+        self.assertEqual([x["id"] for x in hl.open_entries()], [e["id"]])
+
+    def test_nested_repo_inside_the_worktree_does_not_own_the_entry(self):
+        e = self.kill()
+        nested = os.path.join(self.wt, "inner")
+        os.makedirs(nested)
+        subprocess.run(["git", "init", "-q", nested], check=True)
+        pkg = os.path.join(self.wt, "pkg")
+        os.makedirs(pkg)
+        self.assertFalse(hl.owns(e, nested))
+        self.assertTrue(hl.owns(e, pkg))
+
+    def test_ledger_rotation_keeps_only_open_entries(self):
+        a = self.kill(command="npx jest a")
+        b = self.kill(command="npx jest b")
+        hl.mark_done(self.wt, "npx jest a")
+        hl.rotate_ledger(max_bytes=10)
+        self.assertTrue(os.path.exists(str(hl.ledger_path()) + ".1"))
+        self.assertEqual([x["id"] for x in hl.open_entries()], [b["id"]])
+        self.assertEqual([x["id"] for x in hl.read_events() if x["event"] == "kill"], [b["id"]])
+
+
+class BrakeRunTest(Base):
+    """heavy-run behaviour around a brake kill (the child records the kill, then dies)."""
+
+    def killer_job(self, marker_name="marker"):
+        marker = os.path.join(self.tmp, marker_name)
+        script = os.path.join(self.tmp, "jest")  # named jest so the label is retry-safe
+        open(script, "w").write(
+            f"#!/bin/sh\nif [ ! -f {marker} ]; then touch {marker}; "
+            f"{sys.executable} -c \"import sys;sys.path.insert(0,'{HOOKS}');import heavy_lib as h;"
+            f"h.record_kill('{self.wt}','{script}',1,1,1,$PPID)\"; kill -9 $$; fi\nexit 0\n")
+        os.chmod(script, 0o755)
+        return script
+
+    def test_foreground_brake_kill_exits_without_retrying(self):
+        script = self.killer_job()
+        out, err, rc = self.heavy(script, budget="20", extra_env={"HEAVY_RUN_RETRY_COOLDOWN_S": "0.2"})
+        self.assertNotEqual(rc, 0, err)
+        self.assertIn("memory brake stopped", err)
+        self.assertEqual(len(hl.open_entries()), 1)  # left for the ledger to nudge a re-run
+
+    def test_background_retry_of_a_safe_label_and_sigterm_after_the_child_exits(self):
+        script = self.killer_job("m2")
+        p = self.heavy(script, budget="0", extra_env={"HEAVY_RUN_RETRY_COOLDOWN_S": "30"}, wait=False)
+        for _ in range(100):  # wait for the kill to be ledgered; the retry cooldown then starts
+            if hl.read_events():
+                break
+            time.sleep(0.1)
+        time.sleep(0.8)
+        p.send_signal(signal.SIGTERM)  # handlers must be restored once the child is gone
+        p.communicate(timeout=5)
+        self.assertEqual(p.returncode, -signal.SIGTERM)
 
 
 class BrakeTest(Base):
@@ -260,41 +397,69 @@ class BrakeTest(Base):
         self.mg.LOG = self.env["MEMORY_GUARD_LOG"] and __import__("pathlib").Path(self.env["MEMORY_GUARD_LOG"])
 
     def table(self, rows):
-        return {pid: (ppid, rss, cmd) for pid, ppid, rss, cmd in rows}
+        return {pid: (ppid, rss, cmd, age) for pid, ppid, rss, cmd, age in rows}
 
-    def run_brake(self, rows, dry=False, free=2500):
+    def run_brake(self, rows, dry=False, free=900, critical=True, max_kills=1):
         killed = []
         self.mg.BRAKE_FREE_MB = free
+        self.mg.BRAKE_MAX_KILLS_PER_CYCLE = max_kills
         with mock.patch.object(self.mg, "ps_table", return_value=self.table(rows)), \
                 mock.patch.object(self.mg, "pid_cwd", return_value=self.wt), \
                 mock.patch.object(self.mg.os, "kill", side_effect=lambda pid, sig: killed.append(pid)):
-            n = self.mg.brake(dry)
+            n = self.mg.brake(dry, critical=critical)
         return n, killed
 
+    # (pid, ppid, rss_mb, command, age_s): tsc is the oldest job, eslint the biggest of the others
     ROWS = [
-        (100, 1, 40, "node /x/node_modules/.bin/jest src"), (101, 100, 150, "node /x/node_modules/jest-worker/processChild.js"),
-        (102, 100, 120, "node /x/node_modules/jest-worker/processChild.js"),
-        (200, 1, 700, "node /x/node_modules/typescript/bin/tsc --noEmit"),
-        (300, 1, 600, "node /y/node_modules/.bin/eslint ."),
-        (400, 1, 30, "/Applications/Claude.app/Contents/MacOS/Claude"),
-        (500, 1, 20, "python3 /Users/e/bin/heavy-run npx jest waiting-job"),  # a job waiting in the gate
+        (100, 1, 40, "node /x/node_modules/.bin/jest src", 100),
+        (101, 100, 150, "node /x/node_modules/jest-worker/processChild.js", 100),
+        (102, 100, 120, "node /x/node_modules/jest-worker/processChild.js", 100),
+        (200, 1, 700, "node /x/node_modules/typescript/bin/tsc --noEmit", 500),
+        (300, 1, 600, "node /y/node_modules/.bin/eslint .", 50),
+        (400, 1, 30, "/Applications/Claude.app/Contents/MacOS/Claude", 900),
+        (500, 1, 20, "python3 /Users/e/bin/heavy-run npx jest waiting-job", 10),  # a job waiting in the gate
     ]
 
-    def test_kills_whole_jobs_biggest_first_only_until_enough_freed(self):
-        n, killed = self.run_brake(self.ROWS, free=800)
-        self.assertEqual(n, 2)  # tsc (700) then eslint (600) -> 1300 >= 800; the 310 MB jest job is spared
-        self.assertEqual(killed, [200, 300])
-        self.assertNotIn(100, killed)
+    def test_lone_job_is_not_killed_on_swap_alone(self):
+        n, killed = self.run_brake([self.ROWS[3]], critical=False)
+        self.assertEqual((n, killed), (0, []))
 
-    def test_job_is_killed_as_a_unit_and_ledgered(self):
+    def test_swap_only_with_two_jobs_kills_one_and_spares_the_oldest(self):
+        n, killed = self.run_brake(self.ROWS, critical=False, free=99999)
+        self.assertEqual(killed, [300])  # eslint: biggest non-oldest; tsc (oldest) and jest spared
+        self.assertEqual(n, 1)
+
+    def test_lone_job_is_killed_at_critical(self):
+        n, killed = self.run_brake([self.ROWS[3]], critical=True)
+        self.assertEqual((n, killed), (1, [200]))
+
+    def test_one_kill_per_cycle_even_when_far_over(self):
         n, killed = self.run_brake(self.ROWS, free=99999)
-        self.assertEqual(sorted(killed), [100, 101, 102, 200, 300])  # workers go with their jest parent
+        self.assertEqual(killed, [300])
+        self.assertEqual(len(hl.open_entries()), 1)
+
+    def test_job_is_killed_as_a_unit_and_ledgered_per_job(self):
+        n, killed = self.run_brake(self.ROWS, free=99999, max_kills=5)
+        self.assertEqual(sorted(killed), [100, 101, 102, 300])  # workers go with their jest parent; oldest (tsc) spared
         self.assertNotIn(500, killed)  # the waiting heavy-run is never killed
         self.assertNotIn(400, killed)  # nor Claude
         entries = hl.open_entries()
-        self.assertEqual(len(entries), 3)  # one entry per job, not per process
+        self.assertEqual(len(entries), 2)  # one entry per job, not per process
         jest = [e for e in entries if e["pid"] == 100][0]
         self.assertEqual((jest["worktree"], jest["kind"], jest["job_rss_mb"]), (os.path.realpath(self.wt), "jest", 310))
+
+    def test_stops_once_enough_is_freed(self):
+        n, killed = self.run_brake(self.ROWS, free=500, max_kills=5)
+        self.assertEqual(killed, [300])  # 600 MB >= 500, so jest is spared too
+
+    def test_never_list_protects_every_alternative(self):
+        # each command matches BRAKE_PATTERNS (it would be killed) and must be saved only by BRAKE_NEVER
+        for cmd in ("node /x/xcodebuild/jest", "node /x/eas-cli/node_modules/.bin/jest", "node /x/eas build/jest",
+                    "/Applications/Claude.app/Contents/Helper/jest", "/usr/local/bin/claude --jest",
+                    "node /x/mcp-server/node_modules/.bin/jest", "python3 /bin/heavy-run npx jest"):
+            self.assertTrue(self.mg.BRAKE_PATTERNS.search(cmd), cmd)
+            n, killed = self.run_brake([(10, 1, 900, cmd, 100)])
+            self.assertEqual((n, killed), (0, []), cmd)
 
     def test_dry_run_kills_and_records_nothing(self):
         n, killed = self.run_brake(self.ROWS, dry=True)
@@ -303,7 +468,7 @@ class BrakeTest(Base):
 
     def test_heavy_run_job_keeps_its_command_in_the_ledger(self):
         rec = [{"pid": 4242, "child": 90, "cwd": self.wt, "cmd": "npm test", "slot": 0}]
-        rows = [(90, 1, 10, "npm test"), (100, 90, 300, "node /x/node_modules/.bin/jest")]
+        rows = [(90, 1, 10, "npm test", 5), (100, 90, 300, "node /x/node_modules/.bin/jest", 5)]
         with mock.patch.object(hl, "gate_records", return_value=rec):
             self.run_brake(rows)
         e = hl.open_entries()[0]
