@@ -3,7 +3,7 @@
 Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and inventory: unleashed-superpowers `docs/learning/`). When a check fires, fix the action; never route around it.
 
 ## Reporting
-- Bring fixes, not problems ("X was red -> here's the PR that fixes it").
+- Bring fixes, not problems.
 - One question per turn (High-Level style ✓; supersedes the memory note "ask 2-4 questions"). A dismissed question stays dismissed. Never ask "want me to go ahead?" for work already asked for ✓.
 - Never raise MCP/connector auth problems ✓: use the CLI and move on (founder 2026-10-01).
 - One short ordered Needs you list on the status page, each step with a deep link; update it in place.
@@ -11,7 +11,7 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 - Every link you give must be live: opened this session or a known dashboard deep link ✓.
 
 ## CI
-- Slow isn't stuck: a first result can take 1h+. Check whether other PRs in the repo got results recently before calling it stuck.
+- Slow isn't stuck: a first result can take 1h+; check whether other PRs got results recently.
 - Never push or empty-commit just to restart checks ✓; it re-queues the PR at the back.
 - "Flaky" is not a diagnosis: reproduce (e.g. on an overloaded machine), fix the cause, prove the fix the same way.
 
@@ -31,5 +31,6 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 ## Output
 - Format, the status page and "say each fact once" live in the High-Level output style; nothing here repeats it.
 - Auto ship-check: any fix/feature/change -> run /ship-check (red-team) BEFORE merging and before the final message; the Stop hook `auto-ship-check.py` is a backstop, not the plan. Never end with "want me to ship-check?" ✓.
-- Output tokens are money: fewest words that carry the fact. Background notifications with no change = no reply. Explanations only when asked; direct questions lead with the answer.
+- Output tokens are money: fewest words that carry the fact. Background notifications with no change = no reply. Explain only when asked; direct questions lead with the answer.
+- Councils: skill `council`. Legal changes need its 4-lawyer panel first.
 - Copy never uses "X for Y" brand comparisons ("the Uber for coaches") ✓.

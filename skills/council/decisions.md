@@ -1,0 +1,37 @@
+# Council decisions log
+
+Newest last. Add a row after every council. Columns: date | panel | question | verdict | dissent | link.
+Dates are 2026. Seeded 22 Nov from chats and memory; "link" is the memory note, wiki page or session.
+
+| date | panel | question | verdict | dissent | link |
+|---|---|---|---|---|---|
+| 16 Oct | Creator | Coach community monetisation | Flat 10% to Unleashed, coach keeps 90%, no cap (founder replaced the council's caps) | Council wanted caps | memory `research-coach-community-monetisation` |
+| 16 Oct | Creator | Partner lifetime commission (163 passages) | Lifetime commission kept | none recorded | wiki `partner-lifetime-commission` |
+| 16 Oct | Creator | Partner buyout multiple (80 passages) | Keep 10x on trailing 3-month average, no optional extras | none recorded | wiki `partner-buyout-multiple` |
+| 16 Oct | Creator | Pricing ladder and monthly credits | First ladder: OS / Pro £99 / Systems £300 / Business £500 / Scale £1,000 plus monthly credits. Superseded 26 Oct by £300 / £500 / £1k / £4k with hidden credits (current; older prices are stale) | none recorded | memory `project-current-pricing-2026-10-26` |
+| 22 Oct | Creator | Setter compensation (123 passages, 11 clones) | Verdict in linked note (setter/closer split) | none recorded | wiki `setter-compensation`, `setter-closer-split` |
+| 25 Oct | Creator | Multi-location pricing | Extra location 70% / 60% | none recorded | wiki `multi-location-pricing` |
+| 26 Oct | Creator | Rep pay model | Flat 22% (25% with care), 120-day rule, 10% floor, restore on next sale | none recorded | memory `research-rep-pay-flat` |
+| 26 Oct | Creator | Fair-use overage | Verdict in linked note | none recorded | wiki `fair-use-overage` |
+| 26 Oct | Creator | Value gauges (12 ideas added) | Show a Claude-style usage bar, keep value gauges | none recorded | memory `research-value-gauges` |
+| 26 Oct | 4-lawyer | Partner Agreement v9, recording policy v2, Referral Partner Agreement | Shipped without the panel: the failure that created the standing rule | n/a | memory `feedback-legal-changes-need-lawyer-panel` |
+| 26 Oct | 4-lawyer | R11 care-on-request, flat rate transition | Four lawyers briefed; findings fed the v10 text | per-lawyer findings in the R11 notes | side-session-notes `local_87dc3bf5` |
+| 27 Oct | 4-lawyer | Usage bar | Cannot charge Auto-Boost or pause against a hidden limit | none recorded | memory `research-value-gauges` |
+| 29 Oct | Creator | Setup-fee billing timing | Verdict in linked note | none recorded | wiki `setup-fee-billing-timing` |
+| 29 Oct | 4-lawyer | Recording on bookings (founder decision) | No written recording notice on bookings; consent asked verbally | none recorded | memory `feedback-no-written-recording-notice-on-bookings` |
+| 31 Oct | 4-lawyer | Coach Package clause | Approved, merged as affiliate PR 236 | none recorded | unleashed-affiliate PR 236 |
+| 2 Nov | Business | Avatar hunt (19 avatars) | Reach consumers through the people who gather them: coaches, podcasters, community owners | none recorded | memory `research-avatar-hunt` |
+| 5 Nov | 4-lawyer | Partner Agreement R3 and help copy | Pass with fixes (16 to 17 floor, payout hold, rate change by new version, perks clause 3.9, guardian data sharing); partner summary passed | none recorded | `lawyer-panel-*` notes |
+| 6 Nov | Business | 17 /start pages and 349 drafts | Pages: state setup time, real first-win screenshot, proof via crew count (no invented testimonials). Drafts: hold, one per avatar, free thing first, one easy ask, partner cut in message 2, links must return 200 | none recorded | memory `research-council-landing-drafts` |
+| 6 to 7 Nov | 4-lawyer | Privacy text (OS 1124), affiliate 200 and 243 | Approved with changes; keep voice recordings | none recorded | `lawyer-panel-unleashedos-1124`, `lawyer-panel-pr200-pr243` |
+| 7 Nov | Business | Ecosystem order | Right shape, wrong order: wedge = Systems sold via reps, gate ladder behind proof numbers, scoreboard first, one rung per stranger; host-paid check-in calls as Pro feature; in-app only for v1; Pro counts toward Systems | no churn data (unverified) | memory `research-ecosystem-council` |
+| 7 Nov | Business | Partner pay (4 decisions, founder approved) | Commission on pre-VAT price (unanimous); App Store on net after Apple cut (7 to 3); 180-day clawback from future commission only (9 to 1); no reps below school-leaving age (8 to 2) | MrBeast and Jobs: one flat pre-VAT amount on every channel; Brunson: full store price; Gary Vee and MrBeast: let 14 to 15 year olds message with a solicitor's OK | memory `research-partner-pay-council` |
+| 7 Nov | 4-lawyer | Partner pay drafts (v12, R3, minor terms v5), S6 safeguard DPA sentence | Verdict in linked note | none recorded | `lawyer-panel-pr253`, memory `research-voice-vendor-dpa` |
+| 9 Nov | Business | Demo offers (free Google-reviews summary, free one-page website); Facebook groups post | Two council-reviewed offers approved; guest calls worded as "building", never live | none recorded | session `ce40b8ab` |
+| 10 Nov | UI and QA | Signal: 8 sub-pages | One page with FOCUS/ALL chips and collapsible sections; old routes redirect | one risk per seat | session `016b74d8` |
+| 16 Nov | AI-native 15 | Audit of AI features | AI has tools but no owner context and no evals; fix = Owner Context + look-at-data + corrections-as-data; 7-step roadmap | seat wording too jargon-heavy (founder) | memory `project-ai-native-audit-ledger` |
+| 16 Nov | UI and QA | Settings and paywall layout | Reorganise, every option stays one tap away; paywall trust fix | none recorded | session `49eb4ea0` |
+| 15 to 16 Nov | App-description | How to describe Unleashed OS | Ranked candidates; approved wording kept in memory | none recorded | memory `reference-unleashed-positioning`, PR 868 |
+| 20 Nov | Studio audit | Studio and Clips: upload, clutter, output | Audit run by three seats; fixes queued | none recorded | session `3ea4c28f` |
+| 20 Nov | 4-lawyer (GDPR/PECR) | UK GDPR and PECR text | Verdict in linked note | none recorded | unleashed-systems PR 142 |
+| 22 Nov | Lighthouse and ops | Logins, saving councils, health page | One login per platform shared by every tool; save councils as this skill; Lighthouse health page | none recorded | session `840ac9ce` |
