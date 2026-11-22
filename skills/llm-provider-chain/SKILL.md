@@ -63,7 +63,7 @@ What counts as a prompt or model change:
 - an LLM file inside an eval's area, or a file anywhere that builds a system prompt;
 - a changed line with a model id, a model assignment or a prompt string, outside tests and docs.
 
-An eval counts as run only when a runner (`npm`, `bun`, `deno`, `pytest`, `uv`, `vault run` and the like) starts the command; naming it in a commit message or a grep does not.
+An eval counts as run only when a runner (`npm`, `bun`, `deno`, `pytest`, `uv`, `vault run` and the like) starts the command; naming it in a commit message or a grep does not. It counts as passed on exit status 0. Where the harness reports no status (the desktop app and cloud sessions), the runner's own closing line decides: deno `ok | 42 passed | 0 failed`, pytest `13 passed in 1.2s`, vitest or jest `Tests ... passed`, or an N/M or N% score. Any failed test, suite or error on those lines is a fail. So run the eval as its own command, with nothing after it that prints.
 
 The hook is `cloud-kit/hooks/eval-gate.py`, and its registry is `cloud-kit/hooks/eval-gate.json`. When you edit a row below, update the matching registry entry too; the test checks that the two agree. Off switch, for the founder only: `EVAL_GATE_OFF=1`.
 

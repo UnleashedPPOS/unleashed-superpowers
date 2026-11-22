@@ -28,6 +28,9 @@ What counts as a prompt or model change:
 
 An eval "ran" only when a runner (npm, bun, deno, pytest, uv, vault ...) starts a simple command whose words
 match the eval's `ran` regex; `eval && git commit` counts, a commit message or a grep naming it does not.
+It "passed" on exit status 0. Where the harness reports no status (or `; true`, `| tee` hide it), the
+runner's own closing line decides (deno `ok | 42 passed | 0 failed`, pytest `13 passed in 1.2s`, vitest
+and jest `Tests ... passed`), else an N/M or N% score, and only when nothing after the eval printed.
 
 Unknown repos (anything not in eval-gate.json) are never touched. Fails OPEN on unreadable input or a
 git error (a gate bug must not block every commit). Off switch for the founder: EVAL_GATE_OFF=1.
@@ -81,6 +84,17 @@ YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b")
 PROMPT_WORD = re.compile(r"(?i)system|role|prompt|persona|instruction")
 LONG_YOU_ARE = re.compile(r"\bYou are (?:a|an|the)\b[^\n]{60,}")
 SCORE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|/\s*\d+(?!\d|\s*/))")  # 47/50 or 94% (not a date 11/18/26)
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# A test runner's own closing line. Some harnesses (and the cloud) report no exit status to the hook, and
+# deno / pytest / vitest / jest print no N/M score, so this line is the only proof of a pass there.
+RUN_SUMMARY = (
+    re.compile(r"^\s*(?:ok|FAILED)\s*\|\s*\d+ passed\b"),                                        # deno test
+    re.compile(r"^[=\s]*(?:\d+ [a-z]+, )*\d+ (?:passed|failed|errors?)\b[^\n]*? in \d[\d.]*s\b"),  # pytest
+    re.compile(r"^\s*Test(?:s| Suites| Files):?\s+[^\n]*\b\d+ (?:passed|failed)\b"),             # vitest, jest
+    re.compile(r"^\s*Errors\s+\d+ errors?\b"),                                                   # vitest
+)
+RUN_BAD = re.compile(r"\b[1-9]\d* (?:failed|errors?)\b|^\s*FAILED\b")
+RUN_PASSED = re.compile(r"\b(\d+) passed\b")
 NONE_LINE = re.compile(r"(?i)\beval\s*:\s*none\b[^\n]{8,}")
 SKIPPED_LINE = re.compile(r"(?i)\beval\s*:\s*skipped\s*:\s*[^\n]{8,}")
 
@@ -583,6 +597,20 @@ def grep_reads_files(arg):
     return arg.startswith("-") and any(c in "rRfd" for c in arg[1:])
 
 
+def run_summary(tail):
+    """What the runner's closing line(s) in `tail` say: None when there is none, else (passed, count).
+    Every summary line must be clean (a failed suite next to passing tests is a fail), and a run that
+    passed nothing is not a pass."""
+    lines = [l for l in ANSI.sub("", tail).splitlines() if any(p.match(l) for p in RUN_SUMMARY)]
+    if not lines:
+        return None
+    if any(RUN_BAD.search(l) for l in lines):
+        return (False, 0)
+    m = RUN_PASSED.search(lines[-1])
+    n = int(m.group(1)) if m else 0
+    return (n > 0, n)
+
+
 def post(tool, inp, resp, cwd, reg):
     if tool != "Bash":
         return
@@ -616,11 +644,16 @@ def post(tool, inp, resp, cwd, reg):
     tail = out[-600:]
     m = SCORE.search(tail)
     score = m.group(0) if m else None
+    summary = run_summary(tail)
+    if summary and summary[0] and score is None:
+        score = f"{summary[1]}/{summary[1]}"
     state = load_state()
     for n, (observable, quiet) in hits.items():
         if observable and code is not None:
             ok = code == 0
-        else:  # status masked or not reported: believe a score only if nothing after the eval printed
+        elif summary is not None:  # status masked or not reported: the runner's own closing line decides
+            ok = summary[0] and quiet
+        else:  # no closing line either: believe a score only if nothing after the eval printed
             ok = score is not None and quiet
         state.setdefault(repo, {})[n] = {"ts": time.time(), "cmd": cmd[:300], "tail": tail,
                                          "exit": code if observable else None, "score": score, "ok": ok}
