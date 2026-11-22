@@ -25,7 +25,9 @@ The founder spends a minute in the browser; you do everything else. A hand-off i
 2. One line per step: deep link → what to click → what to copy.
 3. What to paste back: variable names and format.
 4. A doc link if useful.
-5. Put it under Needs you on the status page; chat only when there is no page or it is the turn's one question.
+5. A ready starter: a fenced block the founder can paste into a fresh Claude chat that does the rest (the goal, where the value goes, the check that proves it worked). He should never have to explain the step again (founder 2026-11-22: the essence of the Chief's "Start with Claude" button belongs in every chat).
+6. A tag: `phone` if the step can be done from a phone, `laptop` if it needs the laptop.
+7. Put it under Needs you on the status page; chat only when there is no page or it is the turn's one question.
 
 ### Pass 3: verify every URL
 1. Fetch the vendor docs, read project files (`vercel.json`, `.vercel/project.json`, `package.json`) or query the CLI for deployed domains.
@@ -34,6 +36,7 @@ The founder spends a minute in the browser; you do everything else. A hand-off i
 
 ### Pass 4: finish downstream
 1. When the value arrives: `vault set`, wire it, deploy, verify. Never punt a step back after the paste.
+2. Close the item only when you have checked the result yourself (the key works, the page loads, the row exists). "Done" from the founder starts the check; it does not end the item.
 
 ## Catalogue: deep links
 | Action | Use |
@@ -50,6 +53,8 @@ The founder spends a minute in the browser; you do everything else. A hand-off i
 Unlocks: Slack alerts for voice health; skipped = failures stay silent.
 1. https://my.slack.com/services/new/incoming-webhook/ → pick #voice-health → Add Integration → copy webhook URL
 2. Paste it back as SLACK_VOICE_WEBHOOK=https://hooks.slack.com/... and I'll set the secret.
+Tag: phone
+Starter: "Slack webhook for voice health: I will paste SLACK_VOICE_WEBHOOK. Store it in the vault, set the edge secret, send one test alert to #voice-health and tell me when it shows."
 ```
 
 ## Anti-pattern flags
@@ -67,6 +72,7 @@ Unlocks: Slack alerts for voice health; skipped = failures stay silent.
 | "I'll walk us through it together" | Founder is faster alone with the link. |
 | "The URL is probably /settings/api" | Verify it or say you couldn't. |
 | "They can finish the deploy after pasting" | The contract: you finish everything after the paste. |
+| "He said it's done, close it" | Check the result first; then close. |
 
 ## Reference
 - Always-loaded rule: `cloud-kit/rules/user-handoffs.md`.
