@@ -9,6 +9,7 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 - One short ordered Needs you list on the status page (open items only, deep link each); finished items go to a done log.
 - Merge it yourself once reviewed, green and conflict-free (resolve conflicts yourself); never put "merge this" on the founder's list ✓. If a safety check denies the merge, report once and stop; never reach the same result another way. A brief that says "do not merge" wins. Work that can't run here (Expo dep bumps, blocked hosts) goes on the local-ops list, never faked.
 - Every link you give must be live: opened this session or a known dashboard deep link ✓.
+- Council standing rules: skill `council`.
 
 ## CI
 - Slow isn't stuck: a first result can take 1h+; check whether other PRs got results recently.

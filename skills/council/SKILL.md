@@ -94,6 +94,18 @@ For scripts and bios (18 Nov, jsonl `fa8d1ecb`; brief `scratchpad/video/brief.md
 - Merged: pricing bible's "single-AI council of 4" and "plans council" into panel 2; `/start` pages, Facebook groups post and demo-offer reviews into panel 1; settings and cloud QA into panel 5; Signal design seats into panel 5.
 - Not councils here: Money Printer ten-persona audit and Persona League (trading), logo redesign "become the council" (one-off, seats not recorded), pitch-deck five founder personas (use panel 7's founders), Knowledge Hub Council Mode (product feature, `council-mode-is-scaffolding-not-shipped`).
 
+## Standing rules from verdicts
+A verdict that should hold in every chat becomes a line here (and a check where one can be written), not only a feature (founder 22 Nov 2026: "some of these aspects should be just built into skills… some rule"). The always-loaded rule `working-style.md` points here.
+1. **One next move first.** Founder-facing output (pages, the Chief's Home, plans) leads with one next move, never a pile and never a count of open items. Source: Chief council 22 Nov (Jobs veto).
+2. **Hand-offs come ready.** Every needs-you item carries the exact link, the steps, the paste-back, a ready starter and a phone or laptop tag, and closes only when checked. Lives in `cloud-kit/rules/user-handoffs.md` and skill `founder-handoffs`.
+3. **Heads-up opens every plan and brief.** Risks, spend and decisions taken come before the steps.
+4. **Saved the same turn.** Anything published or decided is saved to unleashed-memory in the turn it happens (rule `research-memory`).
+5. **Count what was done, no guilt words.** User-facing copy never shows overdue counts, missed streaks or "you haven't". Rest is logged as a choice.
+6. **Real people first.** A growth or launch plan starts with a contact with a real person (a call, a reply, a post), before any more software. Source: Thiel and Hormozi dissent, 22 Nov.
+7. **Private messages, untrusted input and a way to send never meet in one agent turn.** Drafts are batched for a human yes; no inbox ingestion with a send path. Source: Willison veto, 22 Nov.
+8. **Every Claude session reports to the Chief** (start, state, needs-you, end) through a hook once the chat register is live; until then the handoff file is the record.
+9. **No member-facing switch-on for an AI feature without an eval on real data** (the Chief's carry needs its 50 real dictations). Source: Husain veto, 22 Nov.
+
 ## Integration
 `/ship-check` stays the code gate; legal text also goes through panel 3 first. `red-team` falsifies claims; a council weighs choices. Memory `feedback-legal-changes-need-lawyer-panel` and `reference-council-roster-skill` point here.
 
