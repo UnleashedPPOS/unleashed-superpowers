@@ -111,6 +111,8 @@ ensure("Stop", "/.claude/hooks/status-page-heartbeat.py", f'"{cl}/hooks/status-p
 # Cloud chats report to Chief when CHIEF_INGEST_CLOUD_TOKEN is set (silent no-op otherwise).
 for ev in ("SessionStart", "UserPromptSubmit", "Stop", "Notification", "SessionEnd"):
     ensure(ev, "/.claude/hooks/chief-cloud-report.py", f'"{cl}/hooks/chief-cloud-report.py"', timeout=5)
+# After a permission prompt is answered, the first tool call flips "waiting" back to "working" (no-op otherwise).
+ensure("PostToolUse", "/.claude/hooks/chief-cloud-report.py", f'"{cl}/hooks/chief-cloud-report.py"', timeout=5)
 # Founder corrections enforced as checks (registry: hooks/corrections.json); one script, four events.
 for ev in ("PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit"):
     ensure(ev, "/.claude/hooks/correction-checks.py", f'"{cl}/hooks/correction-checks.py"', timeout=10)

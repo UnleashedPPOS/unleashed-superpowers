@@ -36,7 +36,7 @@ def serve(handler):
 
 
 def run(event, home, token=TOKEN, url=None, extra=None, session="s1", transcript=None):
-    env = {"PATH": os.environ["PATH"], "HOME": home}
+    env = {"PATH": os.environ["PATH"], "HOME": home, "CHIEF_HOOK_FOREGROUND": "1"}
     if token is not None:
         env["CHIEF_INGEST_CLOUD_TOKEN"] = token
     if url:
@@ -153,6 +153,25 @@ class ChiefCloudReport(unittest.TestCase):
             r = run("SessionStart", self.home, url=url)
             self.assertEqual(r.returncode, 0)
             self.assertLess(time.time() - t, 5)
+        finally:
+            srv.shutdown()
+
+    def test_tool_call_flips_waiting_back_to_working_only(self):
+        run("PostToolUse", self.home, url=self.url)
+        self.assertEqual(len(Capture.hits), 0)
+        run("Notification", self.home, url=self.url)
+        run("PostToolUse", self.home, url=self.url)
+        run("PostToolUse", self.home, url=self.url)
+        self.assertEqual([h["body"]["event"]["chat_state"] for h in Capture.hits], ["waiting", "working"])
+
+    def test_background_mode_returns_at_once_even_with_a_hung_server(self):
+        import time
+        srv, url = serve(Hang)
+        try:
+            t = time.time()
+            r = run("Stop", self.home, url=url, extra={"CHIEF_HOOK_FOREGROUND": "0"})
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+            self.assertLess(time.time() - t, 1.0)
         finally:
             srv.shutdown()
 
