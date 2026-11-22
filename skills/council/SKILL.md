@@ -1,6 +1,6 @@
 ---
 name: council
-description: "The saved roster of every council the founder has run: business lenses (Council of 10), creator and pricing, 4-lawyer panel, AI-native 15, UI and QA, Studio audit, app-description personas, Lighthouse ops, founder-story. Use when the founder says council, the council, get the council on this, ask the council, what would the council say, the AI-native council, the lawyers, 4 lawyers, lawyer panel, hostile lawyer, red-team the legal text, persona review, lens review, UI council, cloud QA council, or wants a second opinion from several viewpoints. One agent plays all seats by default; one agent per seat only for legal, money or irreversible calls. SKIP for a single reviewer, for /ship-check, and for the Knowledge Hub Council Mode product feature."
+description: "The saved roster of every council the founder has run, with a decisions log. Use when the founder says council, the council, get the council on this, AI-native council, the lawyers, 4 lawyers, lawyer panel, UI council, cloud QA council, or persona or lens review. One Opus agent plays all seats by default. SKIP for a single reviewer, /ship-check, and the Knowledge Hub Council Mode feature."
 ---
 
 # Council (saved roster + decisions log)
@@ -9,6 +9,9 @@ description: "The saved roster of every council the founder has run: business le
 
 ## Thesis
 Each chat used to invent its council, so seats drifted. This skill is the one roster. Pick a named panel below, use its seats exactly, then log the verdict in `decisions.md` (same folder). Never invent a seat; add it to the panel here first. Researched 22 Nov 2026 from chats and memory dated 15 Oct to 22 Nov.
+
+## When this fires
+The founder names a council or panel, asks for several viewpoints, or a legal, pricing, pay, UI or AI-design call needs a second opinion.
 
 ## How to run
 1. **Default: ONE Opus agent plays every seat** of the chosen panel (`opus-thinker`, `model: opus`, never Fable). Each seat answers in 2 to 4 lines: position, what it checks, veto yes/no. Then a **Dissent** block, separate from the verdict. Under 300 words back to the parent.
@@ -38,7 +41,7 @@ Used for: ecosystem (7 Nov), partner pay (7 Nov), landing and 349 drafts (6 Nov)
 **Pricing sub-panel (add-on, 8 Nov, proposed not confirmed adopted):** Patrick Campbell (tiers), Nathan Barry (creator and coach pricing), Ramit Sethi (price feel), plus a working PT with 15 clients who would never pay. Add only for pricing questions.
 
 ### 2. Creator council (pricing and partner pay)
-18 Brain clones (creators and coaches in the Brain), plus a platform economist and an App Store / payments engineer, up to 3 rounds. Used for coach monetisation, partner commission, buyout multiple, setter and rep pay, fair-use overage, value gauges, multi-location pricing, setup-fee timing, recording rep meetings, the pricing ladder. Seats: each clone answers from its Brain passages (state passage count); Jay Shetty and Vinh Giang check money terms are clear and in writing up front, no golden handcuffs; Noah Kagan checks onboarding clarity as the retention lever; economist checks unit economics and platform fees; payments engineer checks Apple/Play cut, VAT, refunds, payout timing. Vetoes: unclear terms (Shetty, Giang), anything that breaks the maths (economist), anything the stores or Stripe cannot do (engineer). Founder decision overrides council caps. Sources: memory `research-partner-pay-council`, `research-rep-pay-flat`, `research-coach-community-monetisation`, `research-value-gauges`; unleashed-memory `wiki/investigations/`. Merge note: this absorbs the 16 Oct "single-AI council of 4 fictional experts" and "plans council" from the pricing bible, which were the same job with fewer seats.
+18 Brain clones as recorded 16 Oct (count not re-checked), plus a platform economist and an App Store / payments engineer, up to 3 rounds. Used for coach monetisation, partner commission, buyout multiple, setter and rep pay, fair-use overage, value gauges, multi-location pricing, setup-fee timing, recording rep meetings, the pricing ladder. Seats: each clone answers from its Brain passages (state passage count); Jay Shetty and Vinh Giang check money terms are clear and in writing up front, no golden handcuffs; Noah Kagan checks onboarding clarity as the retention lever; economist checks unit economics and platform fees; payments engineer checks Apple/Play cut, VAT, refunds, payout timing. Vetoes: unclear terms (Shetty, Giang), anything that breaks the maths (economist), anything the stores or Stripe cannot do (engineer). Founder decision overrides council caps. Sources: memory `research-partner-pay-council`, `research-rep-pay-flat`, `research-coach-community-monetisation`, `research-value-gauges`; unleashed-memory `wiki/investigations/`. Merge note: this absorbs the 16 Oct "single-AI council of 4 fictional experts" and "plans council" from the pricing bible, which were the same job with fewer seats.
 
 ### 3. 4-lawyer panel (hostile lawyers, LEGAL: one agent per lawyer, Opus, read-only)
 Each lawyer grades findings Blocker / Important / Nit and gives exact replacement wording. Rounds R1 to R4 live in `findings-register.ts` (`/admin/legal-research`, unleashed-affiliate). Inputs: a diff plus the full files. Never merge or deploy legal text before all four report.
@@ -90,6 +93,9 @@ For scripts and bios (18 Nov, jsonl `fa8d1ecb`; brief `scratchpad/video/brief.md
 ## Merges and not-councils
 - Merged: pricing bible's "single-AI council of 4" and "plans council" into panel 2; `/start` pages, Facebook groups post and demo-offer reviews into panel 1; settings and cloud QA into panel 5; Signal design seats into panel 5.
 - Not councils here: Money Printer ten-persona audit and Persona League (trading), logo redesign "become the council" (one-off, seats not recorded), pitch-deck five founder personas (use panel 7's founders), Knowledge Hub Council Mode (product feature, `council-mode-is-scaffolding-not-shipped`).
+
+## Integration
+`/ship-check` stays the code gate; legal text also goes through panel 3 first. `red-team` falsifies claims; a council weighs choices. Memory `feedback-legal-changes-need-lawyer-panel` and `reference-council-roster-skill` point here.
 
 ## Red flags
 | Thought | Reality |

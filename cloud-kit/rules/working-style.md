@@ -31,6 +31,6 @@ Lines marked ✓ are enforced by the `correction-checks.py` hook (registry and i
 ## Output
 - Format, the status page and "say each fact once" live in the High-Level output style; nothing here repeats it.
 - Auto ship-check: any fix/feature/change -> run /ship-check (red-team) BEFORE merging and before the final message; the Stop hook `auto-ship-check.py` is a backstop, not the plan. Never end with "want me to ship-check?" ✓.
-- Output tokens are money: fewest words that carry the fact. Background notifications with no change = no reply. Explain only when asked.
+- Output tokens are money: fewest words that carry the fact. Background notifications with no change = no reply. Explain only when asked; direct questions lead with the answer.
 - Councils: skill `council`. Legal changes need its 4-lawyer panel first.
 - Copy never uses "X for Y" brand comparisons ("the Uber for coaches") ✓.
