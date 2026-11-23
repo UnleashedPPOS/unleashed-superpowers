@@ -40,7 +40,7 @@ EVENTS = {
 CHAT_STATE = {"SessionStart": "working", "UserPromptSubmit": "working", "Stop": "waiting", "Notification": "waiting", "PostToolUse": "working", "SessionEnd": "done"}
 LAST_LINE_MAX = 200
 SECRET = re.compile(
-    r"(sk-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}"
+    r"(sk-[A-Za-z0-9_-]{10,}|gsk_[A-Za-z0-9]{20,}|(?:sbp|sb_secret)_[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}"
     r"|AKIA[0-9A-Z]{16}|(?:sk|rk)_live_[A-Za-z0-9]{8,}|xox[abprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----"
     r"|Bearer\s+\S+|[A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD)[A-Za-z0-9_]*\s*[=:]\s*\S+)",
     re.I,

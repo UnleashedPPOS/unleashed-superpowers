@@ -131,6 +131,15 @@ class ChiefCloudReport(unittest.TestCase):
         self.assertNotIn("abc.def.ghi", body)
         self.assertIn("[redacted]", body)
 
+    def test_groq_and_supabase_keys_in_last_line_are_scrubbed(self):
+        gsk = "gsk" + "_" + "Ab1" * 8  # built in pieces: not real keys
+        sb = "sb_secret" + "_" + "Zz9" * 6
+        t = self._transcript("groq %s and supabase %s done" % (gsk, sb))
+        run("Stop", self.home, url=self.url, transcript=t)
+        body = json.dumps(Capture.hits[0]["body"])
+        self.assertNotIn("Ab1Ab1", body)
+        self.assertNotIn("Zz9Zz9", body)
+
     def test_session_end_sends_no_last_line(self):
         t = self._transcript("bye")
         run("SessionEnd", self.home, url=self.url, transcript=t)
