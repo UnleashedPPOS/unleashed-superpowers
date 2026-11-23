@@ -35,14 +35,16 @@ def serve(handler):
     return srv, f"http://127.0.0.1:{srv.server_port}/"
 
 
-def run(event, home, token=TOKEN, url=None, extra=None, session="s1"):
-    env = {"PATH": os.environ["PATH"], "HOME": home}
+def run(event, home, token=TOKEN, url=None, extra=None, session="s1", transcript=None):
+    env = {"PATH": os.environ["PATH"], "HOME": home, "CHIEF_HOOK_FOREGROUND": "1"}
     if token is not None:
         env["CHIEF_INGEST_CLOUD_TOKEN"] = token
     if url:
         env["CHIEF_INGEST_URL"] = url
     env.update(extra or {})
     payload = {"hook_event_name": event, "session_id": session, "cwd": home}
+    if transcript:
+        payload["transcript_path"] = transcript
     return subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True, env=env, timeout=20)
 
 
@@ -94,6 +96,60 @@ class ChiefCloudReport(unittest.TestCase):
         run("Stop", self.home, url=self.url, session="other")
         self.assertEqual(len(Capture.hits), 2)
 
+    def _transcript(self, text):
+        p = os.path.join(self.home, "t.jsonl")
+        with open(p, "w") as f:
+            f.write(json.dumps({"type": "user", "message": {"content": "USER-MESSAGE-BODY"}}) + "\n")
+            f.write(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}) + "\n")
+        return p
+
+    def test_register_state_per_event(self):
+        for i, (e, want) in enumerate([("SessionStart", "working"), ("UserPromptSubmit", "working"), ("Stop", "waiting"), ("Notification", "waiting"), ("SessionEnd", "done")]):
+            run(e, self.home, url=self.url, session="st%d" % i)
+            self.assertEqual(Capture.hits[-1]["body"]["event"]["chat_state"], want, e)
+
+    def test_state_change_posts_inside_throttle_window(self):
+        run("UserPromptSubmit", self.home, url=self.url)
+        run("Stop", self.home, url=self.url)
+        run("Stop", self.home, url=self.url)
+        self.assertEqual([h["body"]["event"]["chat_state"] for h in Capture.hits], ["working", "waiting"])
+
+    def test_last_line_is_last_assistant_text_clipped_never_user_text(self):
+        t = self._transcript("Shipped the register. " + "x" * 400)
+        run("Stop", self.home, url=self.url, transcript=t)
+        ev = Capture.hits[0]["body"]["event"]
+        self.assertTrue(ev["last_line"].startswith("Shipped the register."))
+        self.assertLessEqual(len(ev["last_line"]), 200)
+        self.assertNotIn("USER-MESSAGE-BODY", json.dumps(Capture.hits[0]["body"]))
+
+    def test_secret_in_last_line_is_scrubbed(self):
+        key = "sk" + "-fake-" + "A1b2C3d4E5f6G7h8"  # built in pieces: not a real key
+        t = self._transcript("set SOME_API_KEY=%s then Bearer abc.def.ghi done" % key)
+        run("Stop", self.home, url=self.url, transcript=t)
+        body = json.dumps(Capture.hits[0]["body"])
+        self.assertNotIn(key, body)
+        self.assertNotIn("abc.def.ghi", body)
+        self.assertIn("[redacted]", body)
+
+    def test_groq_and_supabase_keys_in_last_line_are_scrubbed(self):
+        gsk = "gsk" + "_" + "Ab1" * 8  # built in pieces: not real keys
+        sb = "sb_secret" + "_" + "Zz9" * 6
+        t = self._transcript("groq %s and supabase %s done" % (gsk, sb))
+        run("Stop", self.home, url=self.url, transcript=t)
+        body = json.dumps(Capture.hits[0]["body"])
+        self.assertNotIn("Ab1Ab1", body)
+        self.assertNotIn("Zz9Zz9", body)
+
+    def test_session_end_sends_no_last_line(self):
+        t = self._transcript("bye")
+        run("SessionEnd", self.home, url=self.url, transcript=t)
+        self.assertNotIn("last_line", Capture.hits[0]["body"]["event"])
+
+    def test_missing_transcript_is_fine(self):
+        r = run("Stop", self.home, url=self.url, transcript="/nonexistent/t.jsonl")
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertNotIn("last_line", Capture.hits[0]["body"]["event"])
+
     def test_unreachable_exits_zero_quietly(self):
         r = run("SessionStart", self.home, url="http://127.0.0.1:1/")
         self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
@@ -105,7 +161,26 @@ class ChiefCloudReport(unittest.TestCase):
             t = time.time()
             r = run("SessionStart", self.home, url=url)
             self.assertEqual(r.returncode, 0)
-            self.assertLess(time.time() - t, 8)
+            self.assertLess(time.time() - t, 5)
+        finally:
+            srv.shutdown()
+
+    def test_tool_call_flips_waiting_back_to_working_only(self):
+        run("PostToolUse", self.home, url=self.url)
+        self.assertEqual(len(Capture.hits), 0)
+        run("Notification", self.home, url=self.url)
+        run("PostToolUse", self.home, url=self.url)
+        run("PostToolUse", self.home, url=self.url)
+        self.assertEqual([h["body"]["event"]["chat_state"] for h in Capture.hits], ["waiting", "working"])
+
+    def test_background_mode_returns_at_once_even_with_a_hung_server(self):
+        import time
+        srv, url = serve(Hang)
+        try:
+            t = time.time()
+            r = run("Stop", self.home, url=url, extra={"CHIEF_HOOK_FOREGROUND": "0"})
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+            self.assertLess(time.time() - t, 1.0)
         finally:
             srv.shutdown()
 
