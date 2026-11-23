@@ -338,6 +338,94 @@ class MentionsAndStatus(Fixture):
         self.assertEqual((st["exit"], st["ok"], st["score"]), (0, True, "47/50"))
         self.assertIsNone(self.bash("git commit -m x", d))
 
+    # Harnesses that report no exit status (this app, the cloud): the runner's closing line is the proof.
+    DENO = "deno test -A supabase/functions/voice/evals/"
+    PYTEST = "python -m pytest tests/test_receptionist_eval.py livekit_agent/tests/test_prompt.py"
+
+    def uos(self):
+        return self.repo("unleashedos", {"supabase/functions/voice/evals/golden.json": "[]\n"})
+
+    def voice(self):
+        return self.repo("unleashed-voice", {"livekit_agent/prompt.py": "P = 'hi'\n"})
+
+    def rec(self, repo, name):
+        return json.load(open(self.state))[repo][name]
+
+    def test_deno_pass_with_no_exit_status_counts(self):
+        d = self.uos()
+        out = "running 42 tests from ./evals_test.ts\n\x1b[32mok\x1b[0m | 42 passed | 0 failed (163ms)\n"
+        for cmd in (self.DENO, self.DENO + " 2>&1 | tail -5", f"cd {d} && {self.DENO}"):
+            self.bash(cmd, d, event="PostToolUse", resp={"stdout": out, "stderr": ""})
+            st = self.rec("unleashedos", "voice")
+            self.assertEqual((st["exit"], st["ok"], st["score"]), (None, True, "42/42"), cmd)
+
+    def test_deno_failed_or_empty_run_with_no_exit_status_does_not_count(self):
+        d = self.uos()
+        for out in ("FAILED | 40 passed | 2 failed (1s)\n",
+                    "ok | 40 passed | 0 failed (1s)\nFAILED | 1 passed | 1 failed (1s)\n",
+                    "ok | 0 passed | 0 failed (3ms)\n",
+                    "error: Module not found\n"):
+            self.bash(self.DENO, d, event="PostToolUse", resp={"stdout": out, "stderr": ""})
+            self.assertFalse(self.rec("unleashedos", "voice")["ok"], out)
+
+    def test_pytest_summary_with_no_exit_status(self):
+        d = self.voice()
+        for out, ok in (("============ 13 passed, 2 warnings in 1.20s ============\n", True),
+                        ("13 passed in 62.10s (0:01:02)\n", True),
+                        ("1 skipped, 12 passed in 0.9s\n", True),
+                        ("======= 3 failed, 10 passed in 2.10s =======\n", False),
+                        ("10 passed, 1 error in 2.10s\n", False),
+                        ("===== 2 errors in 0.40s =====\n", False),
+                        ("no tests ran in 0.01s\n", False)):
+            self.bash(self.PYTEST, d, event="PostToolUse", resp={"stdout": out, "stderr": ""})
+            self.assertEqual(self.rec("unleashed-voice", "prompts")["ok"], ok, out)
+        self.assertIsNone(self.rec("unleashed-voice", "prompts")["score"])
+
+    def test_vitest_and_jest_summaries_with_no_exit_status(self):
+        d = self.systems()
+        cmd = "npx vitest run tests/evals"
+        for out, ok in ((" Test Files  3 passed (3)\n      Tests  42 passed (42)\n   Duration  1.2s\n", True),
+                        (" Test Files  1 failed | 2 passed (3)\n      Tests  42 passed (42)\n", False),
+                        (" Test Files  3 passed (3)\n      Tests  2 failed | 40 passed (42)\n", False),
+                        (" Test Files  3 passed (3)\n      Tests  42 passed (42)\n     Errors  1 error\n", False),
+                        ("Test Suites: 3 passed, 3 total\nTests:       42 passed, 42 total\n", True),
+                        ("Test Suites: 1 failed, 2 passed, 3 total\nTests:       42 passed, 42 total\n", False)):
+            self.bash(cmd, d, event="PostToolUse", resp={"stdout": out, "stderr": ""})
+            self.assertEqual(self.rec("unleashed-systems", "inbox-triage")["ok"], ok, out)
+
+    def test_pass_summary_from_a_later_command_is_not_trusted(self):
+        d = self.uos()
+        for cmd in (self.DENO + '; echo "ok | 42 passed | 0 failed"',
+                    self.DENO + "; tail -1 /tmp/fake.txt",
+                    self.DENO + " && git commit -m x"):
+            self.bash(cmd, d, event="PostToolUse", resp={"stdout": "ok | 42 passed | 0 failed (1s)\n", "stderr": ""})
+            self.assertFalse(self.rec("unleashedos", "voice")["ok"], cmd)
+
+    def test_failing_summary_beats_a_score_when_status_is_masked(self):
+        d = self.uos()
+        self.bash(self.DENO + "; true", d, event="PostToolUse",
+                  resp={"stdout": "coverage 94%\nFAILED | 40 passed | 2 failed (1s)\n", "stderr": "", "exit_code": 0})
+        self.assertFalse(self.rec("unleashedos", "voice")["ok"])
+
+    def test_reported_exit_status_still_wins_over_a_pass_summary(self):
+        d = self.uos()
+        self.bash(self.DENO, d, event="PostToolUse",
+                  resp={"stdout": "ok | 42 passed | 0 failed (1s)\n", "stderr": "", "exit_code": 1})
+        st = self.rec("unleashedos", "voice")
+        self.assertEqual((st["exit"], st["ok"]), (1, False))
+
+    def test_pr_opens_on_a_deno_pass_with_no_exit_status(self):
+        d = self.uos()
+        git(d, "checkout", "-qb", "feat/x")
+        write(d, "supabase/functions/voice/evals/golden.json", '[{"q": 1}]\n')
+        git(d, "commit", "-qam", "feat: x")
+        body = "gh pr create --title t --body 'Eval (voice, offline): 42/42 (100%)'"
+        self.assertIsNotNone(self.bash(body, d))
+        self.assertEqual(self.kind, "deny")
+        self.bash(self.DENO, d, event="PostToolUse",
+                  resp={"stdout": "ok | 42 passed | 0 failed (163ms)\n", "stderr": ""})
+        self.assertIsNone(self.bash(body, d))
+
     def test_pr_blocked_by_failed_eval_but_skipped_line_passes(self):
         d = self.leadgen()
         git(d, "checkout", "-qb", "feat/x")
@@ -453,6 +541,117 @@ class Loopholes(Fixture):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotIn("check skipped", r.stderr)
         self.assertTrue(r.stdout.strip(), "symlinked hook did not gate the commit")
+
+
+class PassSummaryAttacks(Fixture):
+    """Opus red-team of PR #45 (pass from the runner's closing line when no exit status is reported)."""
+    DENO = "deno test -A supabase/functions/voice/evals/"
+    PYTEST = "python -m pytest tests/test_receptionist_eval.py"
+    VITEST = "npx vitest run tests/evals"
+    OK = "ok | 42 passed | 0 failed (1s)\n"
+    QUAL = "PYTHONPATH=. uv run python -m evals.m3 qualify"
+
+    def voice(self):
+        return self.repo("unleashed-voice", {"livekit_agent/prompt.py": "P = 'hi'\n"})
+
+    def ok_after(self, repo, name, cmd, d, stdout, stderr="", code=None):
+        if os.path.exists(self.state):
+            os.remove(self.state)
+        resp = {"stdout": stdout, "stderr": stderr}
+        if code is not None:
+            resp["exit_code"] = code
+        self.bash(cmd, d, event="PostToolUse", resp=resp)
+        if not os.path.exists(self.state):
+            return None
+        with open(self.state) as f:
+            return json.load(f).get(repo, {}).get(name, {}).get("ok")
+
+    def test_fake_closing_line_from_another_command(self):
+        d = self.repo("unleashedos", {"a": "1"})
+        fake = "'ok | 42 passed | 0 failed (1s)'"
+        for cmd in (f"echo {fake}; {self.DENO}", f"printf {fake} >&2; {self.DENO}",
+                    f"cat /tmp/fake.txt && {self.DENO}",
+                    f"deno test -A supabase/functions/owner/x_test.ts; {self.DENO}",
+                    f"{self.DENO}; echo {fake}", f"{self.DENO} && echo {fake}", f"{self.DENO} || echo {fake}",
+                    f"{self.DENO}; printf {fake}", f"{self.DENO}; cat /tmp/fake.txt", f"{self.DENO}; (echo {fake})",
+                    f"{self.DENO}; true `echo {fake} >&2`", f'{self.DENO}; : "$(printf {fake} >&2)"',
+                    f'{self.DENO}; true "${{X:?{fake}}}"', f"{self.DENO} | tee >(sed s/FAILED/ok/ >&2) >/dev/null",
+                    f"{self.DENO} <<EOF\nok | 42 passed | 0 failed (1s)\nEOF",
+                    f"{self.DENO}; python -c \"print({fake})\"", f"{self.DENO} | sed s/FAILED/ok/",
+                    f"{self.DENO} | awk '{{print}}'", f"{self.DENO} | cat /tmp/fake.txt"):
+            self.assertFalse(self.ok_after("unleashedos", "voice", cmd, d, "error: boom\n", self.OK), cmd)
+
+    def test_inline_code_naming_the_eval_is_not_a_run(self):
+        d = self.leadgen()
+        for cmd in ("uv run python -c \"print('47/50')\" evals.m3 qualify",
+                    "node -e \"console.log('47/50')\" evals.m3 qualify", "bun --eval=x evals.m3 qualify"):
+            self.assertIsNone(self.ok_after("unleashed-leadgen", "qualify", cmd, d, "47/50\n", code=0), cmd)
+        self.assertTrue(self.ok_after("unleashed-leadgen", "qualify", "python -W ignore -m evals.m3 qualify", d,
+                                      "47/50\n", code=0))
+
+    def test_runner_says_passed_but_the_run_failed(self):
+        uos, voice, sysd = self.repo("unleashedos", {"a": "1"}), self.voice(), self.systems()
+        cov = "TOTAL 10 5 50%\n\nFAIL Required test coverage of 90% not reached. Total coverage: 50.00%\n"
+        for repo, name, d, cmd, out in (
+                ("unleashedos", "voice", uos, self.DENO, self.OK + "error: Uncaught (in promise) Error: x\n"),
+                ("unleashedos", "voice", uos, self.DENO, "ok | 3 passed\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST, cov + "===== 13 passed in 1.2s =====\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST, "INTERNALERROR> boom\nt.py ....  [100%]\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " -n 4", "created: 4/4 workers\nINTERNALERROR> x\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST,
+                 "!!!!! Interrupted: 1 error during collection !!!!!\n=== 13 passed in 1.2s ===\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST,
+                 " Test Files  3 passed (3)\n      Tests  42 passed (42)\n"
+                 "ERROR: Coverage for lines (50%) does not meet global threshold (80%)\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST,
+                 "Unhandled Errors\n Test Files  3 passed (3)\n      Tests  42 passed (42)\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST,
+                 " Test Files  3 passed (3)\n      Tests  42 passed (42)\n Type Errors  1 error\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST,
+                 "\x1b[2m Test Files \x1b(B 1 failed | 2 passed (3)\n      Tests  42 passed (42)\n"),
+                ("unleashed-systems", "inbox-triage", sysd, "npx vitest run tests/evals/jest",
+                 "Test Suites: 3 passed, 3 total\nTests:       42 passed, 42 total\n"
+                 'Jest: "global" coverage threshold for lines (90%) not met: 50%\n')):
+            self.assertFalse(self.ok_after(repo, name, cmd, d, out), out)
+
+    def test_filters_that_can_drop_the_failed_line(self):
+        voice, sysd = self.voice(), self.systems()
+        for repo, name, d, cmd, out in (
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " | tail -1", "=== 13 passed in 1.2s ===\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " | grep passed", "13 passed in 1.2s\n"),
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " | head -50", "13 passed in 1.2s\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST + " 2>&1 | tail -3",
+                 "      Tests  40 passed (40)\n   Start at  12:00:00\n   Duration  1.2s\n"),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST + " 2>&1 | grep passed",
+                 " Test Files  3 passed (3)\n      Tests  42 passed (42)\n")):
+            self.assertFalse(self.ok_after(repo, name, cmd, d, out), cmd)
+
+    def test_600_character_tail_cutting_a_failed_line(self):
+        voice = self.voice()
+        out = "x" * 700 + "\n3 failed, 10 passed in 2.10s\n"
+        stderr = "w" * (600 - len("10 passed in 2.10s\n"))
+        self.assertFalse(self.ok_after("unleashed-voice", "prompts", self.PYTEST, voice, out, stderr))
+
+    def test_honest_runs_still_pass(self):
+        uos, voice, sysd, lead = self.repo("unleashedos", {"a": "1"}), self.voice(), self.systems(), self.leadgen()
+        green = "\x1b[32mok\x1b[0m | 42 passed | 0 failed (163ms)\r\n"
+        vit = " Test Files  3 passed (3)\n      Tests  42 passed (42)\n   Start at  12:00:00\n   Duration  1.2s\n"
+        for repo, name, d, cmd, out, code in (
+                ("unleashedos", "voice", uos, self.DENO, green, None),
+                ("unleashedos", "voice", uos, self.DENO + " --quiet --reporter=dot 2>&1 | tail -1", self.OK, None),
+                ("unleashedos", "voice", uos, f"cd {uos} && export NO_COLOR=1; {self.DENO}; true", self.OK, 0),
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " -q -x", "13 passed in 1.20s\n", None),
+                ("unleashed-voice", "prompts", voice, self.PYTEST + " -n 4 2>&1 | tail -20",
+                 "created: 4/4 workers\n.............  [100%]\n13 passed in 2.1s\n", None),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST + " --reporter=dot | tee out.txt", vit, None),
+                ("unleashed-systems", "inbox-triage", sysd, self.VITEST + " 2>&1 | tail -n 10", vit, None),
+                ("unleashed-leadgen", "qualify", lead, self.QUAL, "qualify: 47/50 (94%) PASS\n", None),
+                ("unleashed-leadgen", "qualify", lead, self.QUAL + " | grep -i score", "score 47/50\n", 0),
+                ("unleashed-leadgen", "qualify", lead, self.QUAL + " | tee out; true", "qualify: 47/50\n", 0)):
+            self.assertTrue(self.ok_after(repo, name, cmd, d, out, code=code), cmd)
+        write(lead, QUALIFY, "Qualify this lead.\nScore 0-100.\n")
+        git(lead, "add", QUALIFY)
+        self.assertIsNone(self.bash(self.QUAL + " && git commit -m x", lead))
 
 
 class Safety(Fixture):

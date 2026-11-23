@@ -15,13 +15,13 @@ The prompt is a floor. The agent that reads it knows less than the writer about 
 - Ending a build report that contains things nobody asked for.
 
 ## Checklist
-1. Write exactly four lines, at most one sentence each, above Goal:
+1. Write exactly four lines, at most one sentence each, above Goal (the `where-work-runs` template carries them as one `Heads-up:` line; either form is fine):
    - **Missing:** what the prompt leaves out that the work needs.
    - **Could go wrong:** the likeliest way this fails or does harm (money, prod data, privacy, a user-visible regression).
    - **Already exists:** the code, page, skill or memory that already does part of this. Search before asserting.
    - **Newer or better:** a newer version, simpler approach or better tool than the one the prompt assumes.
 2. A line with nothing real to say reads `none found`. Never pad.
-3. In the report, list each addition under Heads-up as one line with a stable ref (PR number plus a short slug). The member-facing tap is "kept" or "not needed"; it writes `chief.addition_feedback` (owner only).
+3. In the report, list each addition under Heads-up as one line with a stable ref (PR number plus a short slug). The founder's tap is "kept" or "not needed"; it writes `chief.addition_feedback` (owner only).
 4. A measure with no feedback yet shows "not measured yet", never zero.
 
 ## Anti-patterns
