@@ -48,6 +48,7 @@ class HookTest(unittest.TestCase):
         self.tmp = os.path.realpath(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, True)
         hook._knowledge.clear()
+        hook._in_repo.clear()
         # The knowledge repo (a stand-in for ~/Developer/unleashed-memory) and a normal code repo.
         self.um = os.path.join(self.tmp, "Developer", "unleashed-memory")
         init_repo(self.um, "https://github.com/UnleashedPPOS/unleashed-memory.git")
@@ -174,6 +175,12 @@ class HookTest(unittest.TestCase):
             self.entries = self.entries[:1]  # a code file inside a repo still blocks
             self.tool("Write", {"file_path": os.path.join(self.app, "new", "deep", "a.ts"), "content": "x"})
             self.assertIn("Code changed", self.run_hook()["reason"])
+
+    def test_in_git_repo_counts_the_edit_when_git_fails(self):
+        hook._in_repo.clear()
+        with mock.patch.object(hook.subprocess, "run", side_effect=FileNotFoundError("git")):
+            self.assertTrue(hook.in_git_repo(os.path.join(self.cwd, "personal", "p.html")))
+        hook._in_repo.clear()
 
     def test_knowledge_repo_agent_instructions_still_count(self):
         w = self.scratch_worktree(self.um)

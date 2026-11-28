@@ -19,7 +19,7 @@ hooks, because many are never learned and he repeats himself. One script, four e
 
 Sub-agents (payload has agent_id) get the PreToolUse guards only. Silent on any error.
 """
-import json, os, re, sys
+import json, os, re, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import corrections_lib as lib  # noqa: E402
@@ -226,7 +226,9 @@ def post_tool(payload):
 
 
 def stop(payload):
-    if payload.get("stop_hook_active") or payload.get("agent_id"):
+    # stop_hook_active is NOT a reason to skip any more: this hook never blocks, so the flag only means
+    # another Stop hook (auto-ship-check) forced a follow-up reply, and that reply needs checking too.
+    if payload.get("agent_id") or not payload.get("session_id"):
         return None
     entries = read_entries(payload.get("transcript_path"))
     text = final_reply(entries) or (payload.get("last_assistant_message") or "")
@@ -247,14 +249,20 @@ def stop(payload):
 
 def pending_reply_hits(payload):
     """Hits saved from the previous reply (read once, then cleared)."""
+    if not payload.get("session_id"):
+        return ""
     sp = state_path(payload, "reply-hits")
     try:
+        fresh = time.time() - os.path.getmtime(sp) < 86400  # a stale note from a day-old reply is dropped
         with open(sp) as f:
             text = json.load(f).get("hits") or ""
-        os.remove(sp)
     except Exception:
-        return ""
-    return text
+        text, fresh = "", False
+    try:
+        os.remove(sp)
+    except OSError:
+        pass
+    return text if fresh and isinstance(text, str) else ""
 
 
 def prompt(payload):

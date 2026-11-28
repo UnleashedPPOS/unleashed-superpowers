@@ -145,6 +145,9 @@ def git(d, *args):
     return subprocess.run(["git", "-C", d, *args], capture_output=True, text=True, timeout=3)
 
 
+_in_repo = {}
+
+
 def in_git_repo(fp):
     """True if fp (or its nearest existing parent dir) is inside a git work tree. Errors count as True."""
     d = os.path.dirname(os.path.abspath(fp))
@@ -153,11 +156,14 @@ def in_git_repo(fp):
         if parent == d:
             return True
         d = parent
-    try:
-        r = git(d, "rev-parse", "--is-inside-work-tree")
-        return not (r.returncode != 0 and "not a git repository" in (r.stderr or ""))
-    except Exception:
-        return True
+    if d not in _in_repo:
+        try:
+            r = subprocess.run(["git", "-C", d, "rev-parse", "--is-inside-work-tree"], capture_output=True,
+                               text=True, timeout=3, env={**os.environ, "LC_ALL": "C"})
+            _in_repo[d] = not (r.returncode != 0 and "not a git repository" in (r.stderr or ""))
+        except Exception:
+            _in_repo[d] = True
+    return _in_repo[d]
 
 
 _knowledge = {}

@@ -274,10 +274,27 @@ class EventTest(TempHome):
                    "session_id": "a"})
         self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "b"}))
 
-    def test_stop_respects_stop_hook_active_and_subagents(self):
+    def test_stop_skips_subagents_but_checks_after_another_hook_blocked(self):
         entries = [prompt("go"), reply("This will take about 2 hours.")]
-        self.assertIsNone(self.stop(entries, stop_hook_active=True))
         self.assertIsNone(self.stop(entries, agent_id="sub"))
+        self.assertIn("time-estimate-in-reply", self.stop(entries, stop_hook_active=True)["reason"])
+
+    def test_subagent_prompt_leaves_saved_hits(self):
+        self.call({"hook_event_name": "Stop", "transcript_path": self.transcript([prompt("go"), reply("About 2 hours.")]),
+                   "session_id": "s"})
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s", "agent_id": "a"}))
+        self.assertIsNotNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
+
+    def test_corrupt_or_stale_saved_hits_are_dropped_quietly(self):
+        sp = hook.state_path({"session_id": "s"}, "reply-hits")
+        with open(sp, "w") as f:
+            f.write("{not json")
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
+        self.assertFalse(os.path.exists(sp))
+        with open(sp, "w") as f:
+            json.dump({"hits": "- old"}, f)
+        os.utime(sp, (0, 0))
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
 
     def test_stop_url_seen_in_tool_result_is_fine(self):
         url = "https://docs.acme-vendor.io/setup"
@@ -298,8 +315,9 @@ class EventTest(TempHome):
         self.assertIsNone(self.stop(entries))
 
     def test_stop_falls_back_to_last_assistant_message(self):
-        self.assertIsNone(self.call({"hook_event_name": "Stop", "last_assistant_message": "Want me to run ship-check?"}))
-        out = self.call({"hook_event_name": "UserPromptSubmit", "prompt": "next"})
+        self.assertIsNone(self.call({"hook_event_name": "Stop", "last_assistant_message": "Want me to run ship-check?",
+                                     "session_id": "s"}))
+        out = self.call({"hook_event_name": "UserPromptSubmit", "prompt": "next", "session_id": "s"})
         self.assertIn("permission-question-in-reply", out["hookSpecificOutput"]["additionalContext"])
 
     # UserPromptSubmit
