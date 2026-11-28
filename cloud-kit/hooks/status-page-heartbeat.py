@@ -43,7 +43,7 @@ PUBLISHED = re.compile(r"Published \S.* at (https://claude\.ai/(?:code/)?artifac
 STATUS = re.compile(r"status", re.I)
 ARTIFACT_URL = re.compile(r"https://claude\.ai/(?:code/)?artifact/[\w-]+")
 NOT_A_PROMPT = ("<local-command", "[Request interrupted", "<task-notification", "<side-sessions-event",
-                "<ci-monitor-event")
+                "<ci-monitor-event", "<cross-session-message")
 FRESH = {"off": 0, "turn": 0, "pub": 0, "nudge": 0, "url": "", "brief": "", "work": False, "wts": 0, "fired": 0, "pending": ""}
 
 

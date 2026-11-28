@@ -151,6 +151,11 @@ class HeartbeatTest(unittest.TestCase):
                  result(T0 + 11, f"Published x at {PARENT}", "b"), tool(T0 + 20, "Edit", file_path=self.repo_file))
         self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
 
+    def test_child_session_message_link_is_not_the_page(self):
+        msg = f'<cross-session-message from="local_x">Done. Status page: {PARENT}</cross-session-message>'
+        self.add(prompt(T0), prompt(T0 + 5, msg), tool(T0 + 10, "Edit", file_path=self.repo_file))
+        self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
+
     def test_task_notification_does_not_rearm_stop(self):
         self.add(prompt(T0), published(T0 + 10), tool(T0 + 20, "Bash", command="git commit -m x"))
         self.assertIsNotNone(self.run_hook(T0 + 30, event="Stop"))
