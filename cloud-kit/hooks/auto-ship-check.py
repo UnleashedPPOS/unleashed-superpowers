@@ -27,6 +27,9 @@ removed before the turn ends. Each sha must be new since the prompt, its subject
 command, and the command must not loop or wrap git in another shell; otherwise the time-window
 check below is the fallback. PDFs are docs in every repo.
 
+Files outside any git repo (personal notes, one-off pages in ~/Developer/personal) never block:
+nothing there ships. Founder 2026-11-28: a personal reading page triggered a ship-check demand twice.
+
 Known gap: sub-agent edits that are neither committed in the session cwd's repo nor made by
 this transcript (e.g. uncommitted work in another worktree) are not seen.
 """
@@ -140,6 +143,27 @@ def is_doc(path, knowledge=False):
 
 def git(d, *args):
     return subprocess.run(["git", "-C", d, *args], capture_output=True, text=True, timeout=3)
+
+
+_in_repo = {}
+
+
+def in_git_repo(fp):
+    """True if fp (or its nearest existing parent dir) is inside a git work tree. Errors count as True."""
+    d = os.path.dirname(os.path.abspath(fp))
+    while d and not os.path.isdir(d):
+        parent = os.path.dirname(d)
+        if parent == d:
+            return True
+        d = parent
+    if d not in _in_repo:
+        try:
+            r = subprocess.run(["git", "-C", d, "rev-parse", "--is-inside-work-tree"], capture_output=True,
+                               text=True, timeout=3, env={**os.environ, "LC_ALL": "C"})
+            _in_repo[d] = not (r.returncode != 0 and "not a git repository" in (r.stderr or ""))
+        except Exception:
+            _in_repo[d] = True
+    return _in_repo[d]
 
 
 _knowledge = {}
@@ -366,7 +390,7 @@ def main():
                 continue
             elif name in EDIT_TOOLS:
                 fp = str(inp.get("file_path") or inp.get("notebook_path") or "")
-                if fp and not fp.startswith(SKIP_PREFIXES) and not edit_is_doc(fp):
+                if fp and not fp.startswith(SKIP_PREFIXES) and not edit_is_doc(fp) and in_git_repo(fp):
                     changed = True
                     prose = prose and is_prose(fp)
             elif name == "Bash" and GIT_CHANGE.search(str(inp.get("command", ""))) and commit_shas_docs_only(

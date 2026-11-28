@@ -257,18 +257,44 @@ class EventTest(TempHome):
                                      "transcript_path": t, "session_id": "s1", "tool_use_id": "t1"}))
 
     # Stop
-    def stop(self, entries, **kw):
-        return self.call(dict({"hook_event_name": "Stop", "transcript_path": self.transcript(entries), "session_id": "s"}, **kw))
+    def stop(self, entries, **kw):  # Stop never blocks; returns what the next prompt is told
+        out = self.call(dict({"hook_event_name": "Stop", "transcript_path": self.transcript(entries), "session_id": "s"}, **kw))
+        assert out is None, out
+        nxt = self.call({"hook_event_name": "UserPromptSubmit", "prompt": "next", "session_id": "s"})
+        return {"reason": nxt["hookSpecificOutput"]["additionalContext"]} if nxt else None
 
-    def test_stop_blocks_time_estimate(self):
+    def test_stop_never_blocks_and_feeds_next_prompt_once(self):
         out = self.stop([prompt("go"), reply("Built. The migration will take about 2 hours.")])
-        self.assertEqual(out["decision"], "block")
         self.assertIn("time-estimate-in-reply", out["reason"])
+        self.assertIn("Don't redo it", out["reason"])
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "again", "session_id": "s"}))
 
-    def test_stop_respects_stop_hook_active_and_subagents(self):
+    def test_saved_hits_are_per_session(self):
+        self.call({"hook_event_name": "Stop", "transcript_path": self.transcript([prompt("go"), reply("About 2 hours.")]),
+                   "session_id": "a"})
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "b"}))
+
+    def test_stop_skips_subagents_but_checks_after_another_hook_blocked(self):
         entries = [prompt("go"), reply("This will take about 2 hours.")]
-        self.assertIsNone(self.stop(entries, stop_hook_active=True))
         self.assertIsNone(self.stop(entries, agent_id="sub"))
+        self.assertIn("time-estimate-in-reply", self.stop(entries, stop_hook_active=True)["reason"])
+
+    def test_subagent_prompt_leaves_saved_hits(self):
+        self.call({"hook_event_name": "Stop", "transcript_path": self.transcript([prompt("go"), reply("About 2 hours.")]),
+                   "session_id": "s"})
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s", "agent_id": "a"}))
+        self.assertIsNotNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
+
+    def test_corrupt_or_stale_saved_hits_are_dropped_quietly(self):
+        sp = hook.state_path({"session_id": "s"}, "reply-hits")
+        with open(sp, "w") as f:
+            f.write("{not json")
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
+        self.assertFalse(os.path.exists(sp))
+        with open(sp, "w") as f:
+            json.dump({"hits": "- old"}, f)
+        os.utime(sp, (0, 0))
+        self.assertIsNone(self.call({"hook_event_name": "UserPromptSubmit", "prompt": "x", "session_id": "s"}))
 
     def test_stop_url_seen_in_tool_result_is_fine(self):
         url = "https://docs.acme-vendor.io/setup"
@@ -289,8 +315,10 @@ class EventTest(TempHome):
         self.assertIsNone(self.stop(entries))
 
     def test_stop_falls_back_to_last_assistant_message(self):
-        out = self.call({"hook_event_name": "Stop", "last_assistant_message": "Want me to run ship-check?"})
-        self.assertIn("permission-question-in-reply", out["reason"])
+        self.assertIsNone(self.call({"hook_event_name": "Stop", "last_assistant_message": "Want me to run ship-check?",
+                                     "session_id": "s"}))
+        out = self.call({"hook_event_name": "UserPromptSubmit", "prompt": "next", "session_id": "s"})
+        self.assertIn("permission-question-in-reply", out["hookSpecificOutput"]["additionalContext"])
 
     # UserPromptSubmit
     def test_prompt_with_secret_adds_context(self):

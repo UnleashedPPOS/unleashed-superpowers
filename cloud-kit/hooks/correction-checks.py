@@ -11,12 +11,15 @@ hooks, because many are never learned and he repeats himself. One script, four e
                     written next to a tool call while working gets one nudge per turn (narration).
   Stop              "block" checks on the final reply (time estimates, unverified links, status in
                     chat when a page exists, permission questions, deferral talk, credentials ...).
-                    Never blocks twice in a row (stop_hook_active), so it cannot loop.
-  UserPromptSubmit  "context" checks on the founder's message (a pasted credential).
+                    It never blocks: by the time Stop runs the founder has already seen the reply, so
+                    a forced rewrite only printed the whole reply twice (founder 2026-11-28: "why are
+                    you saying a lot of things twice?"). Hits are saved and fed back on the next turn.
+  UserPromptSubmit  "context" checks on the founder's message (a pasted credential), plus the
+                    saved hits from the last reply, so the next reply avoids them.
 
 Sub-agents (payload has agent_id) get the PreToolUse guards only. Silent on any error.
 """
-import json, os, re, sys
+import json, os, re, sys, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import corrections_lib as lib  # noqa: E402
@@ -223,7 +226,9 @@ def post_tool(payload):
 
 
 def stop(payload):
-    if payload.get("stop_hook_active") or payload.get("agent_id"):
+    # stop_hook_active is NOT a reason to skip any more: this hook never blocks, so the flag only means
+    # another Stop hook (auto-ship-check) forced a follow-up reply, and that reply needs checking too.
+    if payload.get("agent_id") or not payload.get("session_id"):
         return None
     entries = read_entries(payload.get("transcript_path"))
     text = final_reply(entries) or (payload.get("last_assistant_message") or "")
@@ -234,19 +239,44 @@ def stop(payload):
     lib.log_hits(hits, "reply")
     if not hits:
         return None
-    return {"decision": "block", "reason": (
-        "[correction-check] The reply repeats something the founder has corrected before:\n" + lib.describe(hits) +
-        "\nRewrite the reply without it (this check won't fire again on the rewrite). A link is fine once you've "
-        "opened it this session (curl/WebFetch) or it's a known dashboard deep link.")}
+    try:
+        with open(state_path(payload, "reply-hits"), "w") as f:
+            json.dump({"hits": lib.describe(hits)}, f)
+    except OSError:
+        pass
+    return None  # never block: the reply is already on screen, a rewrite would repeat it
+
+
+def pending_reply_hits(payload):
+    """Hits saved from the previous reply (read once, then cleared)."""
+    if not payload.get("session_id"):
+        return ""
+    sp = state_path(payload, "reply-hits")
+    try:
+        fresh = time.time() - os.path.getmtime(sp) < 86400  # a stale note from a day-old reply is dropped
+        with open(sp) as f:
+            text = json.load(f).get("hits") or ""
+    except Exception:
+        text, fresh = "", False
+    try:
+        os.remove(sp)
+    except OSError:
+        pass
+    return text if fresh and isinstance(text, str) else ""
 
 
 def prompt(payload):
     hits = lib.evaluate("prompt", payload.get("prompt") or "", {})
     lib.log_hits(hits, "prompt")
-    if not hits:
+    notes = [lib.describe(hits)] if hits else []
+    last = "" if payload.get("agent_id") else pending_reply_hits(payload)
+    if last:
+        notes.append("Your last reply broke these founder corrections. Don't redo it; just avoid them from "
+                     "this reply on (a link is fine once opened this session or a known dashboard deep link):\n" + last)
+    if not notes:
         return None
     return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                                   "additionalContext": "[correction-check]\n" + lib.describe(hits)}}
+                                   "additionalContext": "[correction-check]\n" + "\n".join(notes)}}
 
 
 HANDLERS = {"PreToolUse": pre_tool, "PostToolUse": post_tool, "Stop": stop, "UserPromptSubmit": prompt}
