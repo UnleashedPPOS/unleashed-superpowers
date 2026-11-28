@@ -156,6 +156,11 @@ class HeartbeatTest(unittest.TestCase):
         self.add(prompt(T0), prompt(T0 + 5, msg), tool(T0 + 10, "Edit", file_path=self.repo_file))
         self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
 
+    def test_app_note_about_child_session_page_is_not_the_page(self):
+        note = f"<system-reminder>\nThe session X you started ended its turn. Status page: {PARENT}\n</system-reminder>"
+        self.add(prompt(T0), prompt(T0 + 5, note), tool(T0 + 10, "Edit", file_path=self.repo_file))
+        self.assertIsNone(self.run_hook(T0 + 300, event="Stop"))
+
     def test_task_notification_does_not_rearm_stop(self):
         self.add(prompt(T0), published(T0 + 10), tool(T0 + 20, "Bash", command="git commit -m x"))
         self.assertIsNotNone(self.run_hook(T0 + 30, event="Stop"))
