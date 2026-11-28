@@ -164,6 +164,17 @@ class HookTest(unittest.TestCase):
             self.tool("Edit", {"file_path": fp, "old_string": "a", "new_string": "b"})
             self.assertIn("Code changed", self.run_hook()["reason"], fp)
 
+    def test_edit_outside_any_git_repo_does_not_block(self):
+        prefixes = tuple(p for p in hook.SKIP_PREFIXES if not p.startswith(("/tmp/", "/private/tmp/", "/var/folders/")))
+        with mock.patch.object(hook, "SKIP_PREFIXES", prefixes):
+            for fp in (os.path.join(self.cwd, "personal", "page.html"), os.path.join(self.cwd, "notes", "x.py")):
+                self.entries = self.entries[:1]
+                self.tool("Write", {"file_path": fp, "content": "<p>hi</p>"})
+                self.assertIsNone(self.run_hook(), fp)
+            self.entries = self.entries[:1]  # a code file inside a repo still blocks
+            self.tool("Write", {"file_path": os.path.join(self.app, "new", "deep", "a.ts"), "content": "x"})
+            self.assertIn("Code changed", self.run_hook()["reason"])
+
     def test_knowledge_repo_agent_instructions_still_count(self):
         w = self.scratch_worktree(self.um)
         out = commit(w, {"CLAUDE.md": "new ingest rule\n"})
