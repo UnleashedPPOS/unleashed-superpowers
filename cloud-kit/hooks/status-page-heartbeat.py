@@ -41,6 +41,7 @@ SPAWN_TOOLS = {"Agent", "Task", "mcp__ccd_session__start_session", "mcp__ccd_ses
 GIT_WORK = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?commit\b|\bgh\s+pr\s+(?:create|merge)\b")
 PUBLISHED = re.compile(r"Published \S.* at (https://claude\.ai/(?:code/)?artifact/[\w-]+)")
 STATUS = re.compile(r"status", re.I)
+REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 ARTIFACT_URL = re.compile(r"https://claude\.ai/(?:code/)?artifact/[\w-]+")
 NOT_A_PROMPT = ("<local-command", "[Request interrupted", "<task-notification", "<side-sessions-event",
                 "<ci-monitor-event", "<cross-session-message")
@@ -82,8 +83,9 @@ def scan(st, e):
         if e.get("isMeta") or e.get("isCompactSummary") or body.lstrip().startswith(NOT_A_PROMPT):
             return
         st["turn"], st["work"] = ts(e) or st["turn"], False
-        urls = ARTIFACT_URL.findall(body)
-        if urls and STATUS.search(body):
+        own = REMINDER.sub("", body)  # app notes about child sessions carry their pages, not ours
+        urls = ARTIFACT_URL.findall(own)
+        if urls and STATUS.search(own):
             st["brief"] = urls[-1]
     elif kind == "assistant" and isinstance(content, list):
         for c in content:
